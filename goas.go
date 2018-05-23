@@ -348,7 +348,7 @@ func (g *Goas) getPackageAst(packagePath string) map[string]*ast.Package {
 
 		astPackages, err := goparser.ParseDir(fileSet, packagePath, parserFileFilter, goparser.ParseComments)
 		if err != nil {
-			log.Fatal("Parse of %s pkg cause error: %s", packagePath, err)
+			log.Fatalf("Parse of %s pkg cause error: %s", packagePath, err)
 		}
 		g.PackagesCache[packagePath] = astPackages
 		return astPackages
