@@ -197,7 +197,7 @@ func (g *Goas) scanPackages(packages []string) []string {
 					if idx != -1 {
 						pack := path[idx:]
 						_, ok := existsPackages[pack]
-						if !ok {
+						if !ok && pack != "" {
 							res = append(res, pack)
 							existsPackages[pack] = true
 						}
@@ -348,7 +348,7 @@ func (g *Goas) getPackageAst(packagePath string) map[string]*ast.Package {
 
 		astPackages, err := goparser.ParseDir(fileSet, packagePath, parserFileFilter, goparser.ParseComments)
 		if err != nil {
-			log.Fatalf("Parse of %s pkg cause error: %s", packagePath, err)
+			log.Fatalf("Parse of \"%s\" pkg cause error: %s", packagePath, err)
 		}
 		g.PackagesCache[packagePath] = astPackages
 		return astPackages
