@@ -842,7 +842,7 @@ func (g *Goas) parseModel(m *Model, modelName string, currentPackage string, kno
 		}
 
 		//log.Printf("Before parse inner model list: %#v\n (%s)", usedTypes, modelName)
-		innerModelList = make([]*Model, 0, len(usedTypes))
+		innerModelList = []*Model{}
 
 		for typeName := range usedTypes {
 			typeModel := &Model{}
