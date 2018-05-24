@@ -77,7 +77,7 @@ func New() *Goas {
 	return g
 }
 
-// CreateOASFile outputs OSA file.
+// CreateOASFile outputs OAS file.
 func (g *Goas) CreateOASFile(path string) error {
 	fd, err := os.Create(path)
 	if err != nil {
