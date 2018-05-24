@@ -30,6 +30,8 @@ type Goas struct {
 	TypeDefinitions  map[string]map[string]*ast.TypeSpec
 	PackagesCache    map[string]map[string]*ast.Package
 	PackageImports   map[string]map[string][]string
+
+	EnableDebug bool
 }
 
 func New() *Goas {
@@ -75,7 +77,7 @@ func New() *Goas {
 func (g *Goas) CreateOASFile(path string) error {
 	fd, err := os.Create(path)
 	if err != nil {
-		return fmt.Errorf("Can not create the master index.json file: %v\n", err)
+		return fmt.Errorf("Can not create the master index.json file: %v", err)
 	}
 	defer fd.Close()
 
@@ -92,8 +94,21 @@ func (g *Goas) CreateOASFile(path string) error {
 	return err
 }
 
+func (g *Goas) debug(v ...interface{}) {
+	if g.EnableDebug {
+		log.Println(v...)
+	}
+}
+
+func (g *Goas) debugf(format string, args ...interface{}) {
+	if g.EnableDebug {
+		log.Printf(format+"\n", args...)
+	}
+}
+
 // parseInfo parses data for InfoObject from main file.
 func (g *Goas) parseInfo() {
+	// Find main file
 	mainFilename := ""
 	goFilenames, err := filepath.Glob("*.go")
 	if err != nil {
@@ -102,12 +117,15 @@ func (g *Goas) parseInfo() {
 	for _, goFilename := range goFilenames {
 		if isMainFile(goFilename) {
 			mainFilename = goFilename
+			break
 		}
 	}
 	if mainFilename == "" {
 		log.Fatal("can not find the main file in the current folder")
 	}
+	g.debugf("main file: %s", mainFilename)
 
+	// Parse main file comments
 	fileSet := token.NewFileSet()
 	fileTree, err := goparser.ParseFile(fileSet, mainFilename, nil, goparser.ParseComments)
 	if err != nil {
@@ -118,11 +136,9 @@ func (g *Goas) parseInfo() {
 	g.OASSpec.Servers = []*ServerObject{{
 		URL: "/",
 	}}
-	g.OASSpec.Info = &InfoObject{
-		Contact: &ContactObject{},
-		License: &LicenseObject{},
-	}
+	g.OASSpec.Info = &InfoObject{}
 	g.OASSpec.Paths = map[string]*PathItemObject{}
+
 	if fileTree.Comments != nil {
 		for _, comment := range fileTree.Comments {
 			for _, commentLine := range strings.Split(comment.Text(), "\n") {
@@ -137,14 +153,29 @@ func (g *Goas) parseInfo() {
 				case "@termsofserviceurl":
 					g.OASSpec.Info.TermsOfService = strings.TrimSpace(commentLine[len(attribute):])
 				case "@contactname":
+					if g.OASSpec.Info.Contact == nil {
+						g.OASSpec.Info.Contact = &ContactObject{}
+					}
 					g.OASSpec.Info.Contact.Name = strings.TrimSpace(commentLine[len(attribute):])
 				case "@contactemail":
+					if g.OASSpec.Info.Contact == nil {
+						g.OASSpec.Info.Contact = &ContactObject{}
+					}
 					g.OASSpec.Info.Contact.Email = strings.TrimSpace(commentLine[len(attribute):])
 				case "@contacturl":
+					if g.OASSpec.Info.Contact == nil {
+						g.OASSpec.Info.Contact = &ContactObject{}
+					}
 					g.OASSpec.Info.Contact.URL = strings.TrimSpace(commentLine[len(attribute):])
 				case "@licensename":
+					if g.OASSpec.Info.License == nil {
+						g.OASSpec.Info.License = &LicenseObject{}
+					}
 					g.OASSpec.Info.License.Name = strings.TrimSpace(commentLine[len(attribute):])
 				case "@licenseurl":
+					if g.OASSpec.Info.License == nil {
+						g.OASSpec.Info.License = &LicenseObject{}
+					}
 					g.OASSpec.Info.License.URL = strings.TrimSpace(commentLine[len(attribute):])
 				}
 			}
@@ -157,7 +188,6 @@ func (g *Goas) parseAPIs() {
 	splitedPackageNames := strings.Split(g.PackageName, "/")
 	layerPackageNames := []string{}
 	for i := range splitedPackageNames {
-		// fmt.Println(filepath.Join(splitedPackageNames[:i+1]...))
 		layerPackageNames = append(layerPackageNames, filepath.Join(splitedPackageNames[:i+1]...))
 	}
 	sort.Slice(layerPackageNames, func(i, j int) bool {
@@ -184,6 +214,7 @@ func (g *Goas) scanPackages(packages []string) []string {
 	for _, packageName := range packages {
 		_, ok := existsPackages[packageName]
 		if !ok {
+			g.debug("found", packageName)
 			res = append(res, packageName)
 			existsPackages[packageName] = true
 
@@ -198,6 +229,7 @@ func (g *Goas) scanPackages(packages []string) []string {
 						pack := path[idx:]
 						_, ok := existsPackages[pack]
 						if !ok && pack != "" {
+							g.debug("found", pack)
 							res = append(res, pack)
 							existsPackages[pack] = true
 						}
@@ -301,7 +333,7 @@ func (g *Goas) getRealPackagePath(packagePath string) string {
 	g.PackagePathCache[packagePath] = pkgRealpath
 
 	if pkgRealpath == "" {
-		// log.Printf("Can not find unused package %s \n", packagePath)
+		g.debugf("Can not find package %s", packagePath)
 	}
 
 	return pkgRealpath
