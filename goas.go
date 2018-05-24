@@ -59,6 +59,10 @@ func New() *Goas {
 		}
 	}
 
+	if packageName == "" {
+		log.Fatalf("Can not find your current package name under GOPATH: %s", gopath)
+	}
+
 	g := &Goas{
 		GoPaths:          gopaths,
 		CurrentGoPath:    currentGopath,
@@ -330,11 +334,12 @@ func (g *Goas) getRealPackagePath(packagePath string) string {
 			}
 		}
 	}
-	g.PackagePathCache[packagePath] = pkgRealpath
 
 	if pkgRealpath == "" {
 		g.debugf("Can not find package %s", packagePath)
 	}
+
+	g.PackagePathCache[packagePath] = pkgRealpath
 
 	return pkgRealpath
 }

@@ -69,5 +69,5 @@ func PostUser() {
 ```
 Go to the folder where is main.go in
 ```
-goas --output osa.json
+goas --output oas.json
 ```
