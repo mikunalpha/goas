@@ -7,9 +7,9 @@ Generate [OpenAPI Specification](https://swagger.io/specification) json file wit
 Currently, only JSON supported
 
 ## Install
+
 ```
-go get -u github.com/mikunalpha/goas
-go install github.com/mikunalpha/goas/cmd/goas
+go get -u github.com/mikunalpha/goas/cmd/goas
 ```
 
 ## Usage
