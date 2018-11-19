@@ -794,6 +794,7 @@ type ModelProperty struct {
 	Description string              `json:"description,omitempty"`
 	Format      string              `json:"format,omitempty"`
 	Items       *ModelPropertyItems `json:"items,omitempty"`
+	Example     interface{}         `json:"example,omitempty"`
 }
 
 type ModelPropertyItems struct {
@@ -1035,7 +1036,7 @@ func (g *Goas) parseModelProperty(m *Model, field *ast.Field, modelPackage strin
 			return
 		}
 	} else if strings.HasPrefix(typeAsString, "map[]") {
-		property.Type = "interface"
+		property.Type = "map"
 	} else if typeAsString == "time.Time" {
 		property.Type = "Time"
 	} else {
@@ -1084,6 +1085,41 @@ func (g *Goas) parseModelProperty(m *Model, field *ast.Field, modelPackage strin
 		}
 		if tag := structTag.Get("json"); tag != "" {
 			tagText = tag
+		}
+		if tag := structTag.Get("example"); tag != "" {
+			if strings.Contains(property.Type, "int") {
+				property.Example, _ = strconv.Atoi(tag)
+			} else if strings.Contains(property.Type, "float") {
+				property.Example, _ = strconv.ParseFloat(tag, 64)
+			} else if property.Type == "array" {
+				b, err := json.RawMessage(tag).MarshalJSON()
+				if err != nil {
+					property.Example = "invalid example"
+				} else {
+					sliceOfInterface := []interface{}{}
+					err := json.Unmarshal(b, &sliceOfInterface)
+					if err != nil {
+						property.Example = "invalid example"
+					} else {
+						property.Example = sliceOfInterface
+					}
+				}
+			} else if property.Type == "map" {
+				b, err := json.RawMessage(tag).MarshalJSON()
+				if err != nil {
+					property.Example = "invalid example"
+				} else {
+					mapOfInterface := map[string]interface{}{}
+					err := json.Unmarshal(b, &mapOfInterface)
+					if err != nil {
+						property.Example = "invalid example"
+					} else {
+						property.Example = mapOfInterface
+					}
+				}
+			} else {
+				property.Example = tag
+			}
 		}
 
 		tagValues := strings.Split(tagText, ",")

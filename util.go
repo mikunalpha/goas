@@ -76,7 +76,7 @@ var basicTypes = map[string]bool{
 
 func isBasicType(typeName string) bool {
 	_, ok := basicTypes[typeName]
-	return ok || strings.Contains(typeName, "interface")
+	return ok || strings.Contains(typeName, "map") || strings.Contains(typeName, "interface")
 }
 
 var basicTypesOASTypes = map[string]string{
@@ -99,7 +99,7 @@ var basicTypesOASTypes = map[string]string{
 
 func isBasicTypeOASType(typeName string) bool {
 	_, ok := basicTypesOASTypes[typeName]
-	return ok || strings.Contains(typeName, "interface")
+	return ok || strings.Contains(typeName, "map") || strings.Contains(typeName, "interface")
 }
 
 var basicTypesOASFormats = map[string]string{

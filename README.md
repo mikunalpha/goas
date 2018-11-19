@@ -28,12 +28,12 @@ Comments in main.go
 Comments for API handleFunc
 ```go
 type User struct {
-  Id   uint64 `json:"id"`
-  Name string `json:"name"`
+  Id   uint64 `json:"id" example:"100"`
+  Name string `json:"name" example:"Mikun"` 
 }
 
 type UsersResponse struct {
-  Data []Users `json:"users"`
+  Data []Users `json:"users" example:"[{\"id\":100, \"name\":\"Mikun\"}]"`
 }
 
 type Error struct {

@@ -14,7 +14,7 @@ type Err struct {
 }
 
 type CatsResp struct {
-	Data []Cat `json:"data"`
+	Data []Cat `json:"data" example:"[{\"name\":\"Mikun\"}]"`
 }
 
 type CatReq struct {
@@ -26,11 +26,12 @@ type CatResp struct {
 }
 
 type Cat struct {
-	Name   *string         `json:"name,omitempty"`
-	Age    int64           `json:"age,omitempty"`
-	Phones *[]string       `json:"phones,omitempty"`
-	Inter  map[string]bool `json:"inter,omitempty"`
-	// Inter interface{} `json:"inter,omitempty"`
+	Name   *string         `json:"name,omitempty" example:"Mog"`
+	Age    int64           `json:"age,omitempty" example:"30"`
+	Phones *[]string       `json:"phones,omitempty" example:"[\"999\"]"`
+	F      float64         `json:"f,omitempty" example:"1.5"`
+	Inter  map[string]bool `json:"inter,omitempty" example:"{\"k\":\"value\"}"`
+	EInter interface{}     `json:"einter,omitempty" example:"1"`
 }
 
 // GetEmpty returns empty object
