@@ -6,6 +6,8 @@
 // @TermsOfServiceUrl http://google.com/
 // @LicenseName MIT
 // @LicenseUrl http://unknown
+// @Server http://www.fake.com Server-1
+// @Server http://www.fake2.com Server-2
 package main
 
 import (

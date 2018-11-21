@@ -147,43 +147,57 @@ func (g *Goas) parseInfo() {
 		for _, comment := range fileTree.Comments {
 			for _, commentLine := range strings.Split(comment.Text(), "\n") {
 				attribute := strings.ToLower(strings.Split(commentLine, " ")[0])
+				value := strings.TrimSpace(commentLine[len(attribute):])
+				if len(value) == 0 {
+					continue
+				}
 				switch attribute {
 				case "@version":
-					g.OASSpec.Info.Version = strings.TrimSpace(commentLine[len(attribute):])
+					g.OASSpec.Info.Version = value
 				case "@title":
-					g.OASSpec.Info.Title = strings.TrimSpace(commentLine[len(attribute):])
+					g.OASSpec.Info.Title = value
 				case "@description":
-					g.OASSpec.Info.Description = strings.TrimSpace(commentLine[len(attribute):])
+					g.OASSpec.Info.Description = value
 				case "@termsofserviceurl":
-					g.OASSpec.Info.TermsOfService = strings.TrimSpace(commentLine[len(attribute):])
+					g.OASSpec.Info.TermsOfService = value
 				case "@contactname":
 					if g.OASSpec.Info.Contact == nil {
 						g.OASSpec.Info.Contact = &ContactObject{}
 					}
-					g.OASSpec.Info.Contact.Name = strings.TrimSpace(commentLine[len(attribute):])
+					g.OASSpec.Info.Contact.Name = value
 				case "@contactemail":
 					if g.OASSpec.Info.Contact == nil {
 						g.OASSpec.Info.Contact = &ContactObject{}
 					}
-					g.OASSpec.Info.Contact.Email = strings.TrimSpace(commentLine[len(attribute):])
+					g.OASSpec.Info.Contact.Email = value
 				case "@contacturl":
 					if g.OASSpec.Info.Contact == nil {
 						g.OASSpec.Info.Contact = &ContactObject{}
 					}
-					g.OASSpec.Info.Contact.URL = strings.TrimSpace(commentLine[len(attribute):])
+					g.OASSpec.Info.Contact.URL = value
 				case "@licensename":
 					if g.OASSpec.Info.License == nil {
 						g.OASSpec.Info.License = &LicenseObject{}
 					}
-					g.OASSpec.Info.License.Name = strings.TrimSpace(commentLine[len(attribute):])
+					g.OASSpec.Info.License.Name = value
 				case "@licenseurl":
 					if g.OASSpec.Info.License == nil {
 						g.OASSpec.Info.License = &LicenseObject{}
 					}
-					g.OASSpec.Info.License.URL = strings.TrimSpace(commentLine[len(attribute):])
+					g.OASSpec.Info.License.URL = value
+				case "@server":
+					fields := strings.Split(value, " ")
+					s := &ServerObject{URL: fields[0], Description: value[len(fields[0]):]}
+					g.OASSpec.Servers = append(g.OASSpec.Servers, s)
 				}
 			}
 		}
+	}
+
+	if len(g.OASSpec.Servers) > 1 {
+		copy(g.OASSpec.Servers[0:], g.OASSpec.Servers[1:])
+		g.OASSpec.Servers[len(g.OASSpec.Servers)-1] = nil
+		g.OASSpec.Servers = g.OASSpec.Servers[:len(g.OASSpec.Servers)-1]
 	}
 }
 

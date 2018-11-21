@@ -24,6 +24,8 @@ Comments in main.go
 // @TermsOfServiceUrl http://someurl.oxox
 // @LicenseName MIT
 // @LicenseURL https://en.wikipedia.org/wiki/MIT_License
+// @Server http://www.fake.com Server-1
+// @Server http://www.fake2.com Server-2
 ```
 Comments for API handleFunc
 ```go
