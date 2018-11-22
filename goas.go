@@ -1029,7 +1029,7 @@ func (g *Goas) parseModelProperty(m *Model, field *ast.Field, modelPackage strin
 	property := &ModelProperty{}
 
 	typeAsString := getTypeAsString(field.Type)
-	//log.Printf("Get type as string %s \n", typeAsString)
+	// log.Printf("Get type as string %s \n", typeAsString)
 
 	reInternalIndirect := regexp.MustCompile("&\\{(\\w*) <nil> (\\w*)\\}")
 	typeAsString = string(reInternalIndirect.ReplaceAll([]byte(typeAsString), []byte("[]$2")))
@@ -1070,6 +1070,13 @@ func (g *Goas) parseModelProperty(m *Model, field *ast.Field, modelPackage strin
 		} else if astStarExpr, ok := field.Type.(*ast.StarExpr); ok {
 			if astIdent, ok := astStarExpr.X.(*ast.Ident); ok {
 				name = astIdent.Name
+			} else if astSelectorExpr, ok := astStarExpr.X.(*ast.SelectorExpr); ok {
+				packageName := modelPackage
+				if astTypeIdent, ok := astSelectorExpr.X.(*ast.Ident); ok {
+					packageName = astTypeIdent.Name
+				}
+
+				name = packageName + "." + strings.TrimPrefix(astSelectorExpr.Sel.Name, "*")
 			}
 		} else {
 			log.Fatalf("Something goes wrong: %#v", field.Type)
