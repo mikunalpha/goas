@@ -8,9 +8,14 @@ import (
 	"github.com/urfave/cli"
 )
 
-var version = "v0.3.0"
+var version = "v0.4.0"
 
 var flags = []cli.Flag{
+	cli.StringFlag{
+		Name:  "package",
+		Value: "",
+		Usage: "Goas will search @comment under the package",
+	},
 	cli.StringFlag{
 		Name:  "output",
 		Value: "oas.json",
@@ -23,7 +28,7 @@ var flags = []cli.Flag{
 }
 
 func action(c *cli.Context) error {
-	g := goas.New()
+	g := goas.New(c.GlobalString("package"))
 
 	if c.GlobalIsSet("debug") {
 		g.EnableDebug = true

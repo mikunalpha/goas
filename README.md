@@ -71,5 +71,5 @@ func PostUser() {
 ```
 Go to the folder where is main.go in
 ```
-goas --output oas.json
+goas --package github.com/mikunalpha/goas/example --output oas.json
 ```

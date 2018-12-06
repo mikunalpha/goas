@@ -19,9 +19,10 @@ import (
 )
 
 type Goas struct {
-	GoPaths       []string
-	CurrentGoPath string
-	PackageName   string
+	GoPaths              []string
+	CurrentGoPath        string
+	SpecUnderPackageName string
+	PackageName          string
 
 	OASSpec *OASSpecObject
 
@@ -34,7 +35,7 @@ type Goas struct {
 	EnableDebug bool
 }
 
-func New() *Goas {
+func New(specUnderPackageName string) *Goas {
 	pwd, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
@@ -64,14 +65,15 @@ func New() *Goas {
 	}
 
 	g := &Goas{
-		GoPaths:          gopaths,
-		CurrentGoPath:    currentGopath,
-		PackageName:      packageName,
-		OASSpec:          &OASSpecObject{},
-		PackagePathCache: map[string]string{},
-		TypeDefinitions:  map[string]map[string]*ast.TypeSpec{},
-		PackagesCache:    map[string]map[string]*ast.Package{},
-		PackageImports:   map[string]map[string][]string{},
+		GoPaths:              gopaths,
+		CurrentGoPath:        currentGopath,
+		SpecUnderPackageName: specUnderPackageName,
+		PackageName:          packageName,
+		OASSpec:              &OASSpecObject{},
+		PackagePathCache:     map[string]string{},
+		TypeDefinitions:      map[string]map[string]*ast.TypeSpec{},
+		PackagesCache:        map[string]map[string]*ast.Package{},
+		PackageImports:       map[string]map[string][]string{},
 	}
 
 	return g
@@ -490,6 +492,10 @@ func (g *Goas) parsePaths(packageName string) {
 }
 
 func (g *Goas) parseOperation(operation *OperationObject, packageName, comment string) error {
+	if g.SpecUnderPackageName != "" && !strings.HasPrefix(packageName, g.SpecUnderPackageName) {
+		return nil
+	}
+
 	commentLine := strings.TrimSpace(strings.TrimLeft(comment, "//"))
 	if len(commentLine) == 0 {
 		return nil
