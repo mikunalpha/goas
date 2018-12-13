@@ -99,6 +99,7 @@ type SchemaObject struct {
 	Required   []string               `json:"required,omitempty"`
 	Properties map[string]interface{} `json:"properties,omitempty"`
 	Items      *ReferenceObject       `json:"items,omitempty"`
+	Example    string                 `json:"example,omitempty"`
 
 	// Ref is for ReferenceObject
 	Ref string `json:"$ref,omitempty"`

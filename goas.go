@@ -780,6 +780,14 @@ func (g *Goas) registerType(typeName string) (string, error) {
 
 			for _, m := range innerModels {
 				registerType := m.Id
+				if m.Ref != "" {
+					if _, ok := g.OASSpec.Components.Schemas[registerType]; !ok {
+						g.OASSpec.Components.Schemas[registerType] = &SchemaObject{
+							Ref: m.Ref,
+						}
+					}
+					continue
+				}
 				if _, ok := g.OASSpec.Components.Schemas[registerType]; !ok {
 					g.OASSpec.Components.Schemas[registerType] = &SchemaObject{
 						Type:       "object",
@@ -793,6 +801,27 @@ func (g *Goas) registerType(typeName string) (string, error) {
 						v.Items = nil
 						v.Format = ""
 					}
+					if v.Example != nil {
+						v.Ref = ""
+						// fmt.Println(m.Id, k, "type", t)
+						example, ok := v.Example.(string)
+						if ok {
+							if strings.HasPrefix(example, "{") {
+								b, err := json.RawMessage(example).MarshalJSON()
+								if err != nil {
+									v.Example = "invalid example"
+								} else {
+									mapOfInterface := map[string]interface{}{}
+									err := json.Unmarshal(b, &mapOfInterface)
+									if err != nil {
+										v.Example = "invalid example"
+									} else {
+										v.Example = mapOfInterface
+									}
+								}
+							}
+						}
+					}
 					g.OASSpec.Components.Schemas[registerType].Properties[k] = v
 				}
 			}
@@ -803,6 +832,7 @@ func (g *Goas) registerType(typeName string) (string, error) {
 }
 
 type Model struct {
+	Ref        string                    `json:"$ref,omitempty"`
 	Id         string                    `json:"id,omitempty"`
 	Required   []string                  `json:"required,omitempty"`
 	Properties map[string]*ModelProperty `json:"properties,omitempty"`
@@ -839,6 +869,21 @@ func (g *Goas) parseModel(m *Model, modelName string, currentPackage string, kno
 	astTypeDef, ok := astTypeSpec.Type.(*ast.Ident)
 	if ok {
 		typeDefTranslations[m.Id] = astTypeDef.Name
+		if modelRef, ok := modelNamesPackageNames[astTypeDef.Name]; ok {
+			m.Ref = modelRef
+		} else {
+			var err error
+			typeModel := &Model{}
+			innerModelList, err = g.parseModel(typeModel, astTypeDef.Name, modelPackage, knownModelNames)
+			if err != nil {
+				fmt.Printf("parse model %s failed: %s\n", astTypeDef.Name, err)
+			} else {
+				innerModelList = append(innerModelList, typeModel)
+			}
+		}
+		if modelRef, ok := modelNamesPackageNames[astTypeDef.Name]; ok {
+			m.Ref = referenceLink(modelRef)
+		}
 	} else if astStructType, ok := astTypeSpec.Type.(*ast.StructType); ok {
 		g.parseFieldList(m, astStructType.Fields.List, modelPackage)
 		usedTypes := map[string]bool{}
@@ -900,7 +945,7 @@ func (g *Goas) parseModel(m *Model, modelName string, currentPackage string, kno
 		}
 
 		//log.Printf("Before parse inner model list: %#v\n (%s)", usedTypes, modelName)
-		innerModelList = []*Model{}
+		// innerModelList = []*Model{}
 
 		for typeName := range usedTypes {
 			typeModel := &Model{}
@@ -922,6 +967,10 @@ func (g *Goas) parseModel(m *Model, modelName string, currentPackage string, kno
 									}
 									continue
 								}
+								// if indirectRef, ok := modelNamesPackageNames[translation]; ok {
+								// 	property.Ref = referenceLink(indirectRef)
+								// 	continue
+								// }
 							}
 							property.Ref = referenceLink(typeModel.Id)
 						} else {
@@ -942,6 +991,126 @@ func (g *Goas) parseModel(m *Model, modelName string, currentPackage string, kno
 		// log.Printf("After parse inner model list: %#v\n (%s)", usedTypes, modelName)
 		// log.Fatalf("Inner model list: %#v\n", innerModelList)
 
+	} else if astMapType, ok := astTypeSpec.Type.(*ast.MapType); ok {
+		m.Properties = map[string]*ModelProperty{}
+		mapProperty := &ModelProperty{}
+
+		typeName := fmt.Sprint(astMapType.Value)
+
+		reInternalIndirect := regexp.MustCompile("&\\{(\\w*) <nil> (\\w*)\\}")
+		typeName = string(reInternalIndirect.ReplaceAll([]byte(typeName), []byte("[]$2")))
+
+		reInternalRepresentation := regexp.MustCompile("&\\{(\\w*) (\\w*)\\}")
+		typeName = string(reInternalRepresentation.ReplaceAll([]byte(typeName), []byte("$1.$2")))
+
+		if strings.HasPrefix(typeName, "[]") {
+			mapProperty.Type = "array"
+			g.setItemType(mapProperty, typeName[2:])
+			// if is Unsupported item type of list, ignore this mapProperty
+			if mapProperty.Items.Type == "undefined" {
+				mapProperty = nil
+			}
+		} else if strings.HasPrefix(typeName, "map[]") {
+			mapProperty.Type = "map"
+		} else if typeName == "time.Time" {
+			mapProperty.Type = "Time"
+		} else {
+			mapProperty.Type = typeName
+		}
+		typeName = mapProperty.Type
+
+		// fmt.Println(mapProperty.Items.Type)
+
+		if typeName == "array" {
+			// mapProperty.Items = &ModelPropertyItems{}
+			if mapProperty.Items.Type != "" {
+				typeName = mapProperty.Items.Type
+			} else {
+				typeName = mapProperty.Items.Ref
+			}
+		}
+		if translation, ok := typeDefTranslations[typeName]; ok {
+			typeName = translation
+		}
+
+		if isBasicType(typeName) {
+			if isBasicTypeOASType(typeName) {
+				if mapProperty.Type != "array" {
+					mapProperty.Format = basicTypesOASFormats[typeName]
+					mapProperty.Type = basicTypesOASTypes[typeName]
+				} else {
+					if isBasicType(mapProperty.Items.Type) {
+						if isBasicTypeOASType(mapProperty.Items.Type) {
+							mapProperty.Items.Type = basicTypesOASTypes[mapProperty.Items.Type]
+						}
+					}
+				}
+			}
+		}
+
+		if _, exists := knownModelNames[typeName]; exists {
+			// fmt.Println("@", typeName)
+			if _, ok := modelNamesPackageNames[typeName]; ok {
+				if translation, ok := typeDefTranslations[modelNamesPackageNames[typeName]]; ok {
+					if isBasicType(translation) {
+						if isBasicTypeOASType(translation) {
+							// fmt.Println(modelNamesPackageNames[typeName], translation)
+							mapProperty.Type = basicTypesOASTypes[translation]
+						}
+						// continue
+					}
+				}
+				if mapProperty.Type != "array" {
+					mapProperty.Ref = referenceLink(modelNamesPackageNames[typeName])
+					// mapProperty.Ref = modelNamesPackageNames[typeName]
+				} else {
+					mapProperty.Items.Ref = referenceLink(modelNamesPackageNames[typeName])
+					// mapProperty.Items.Ref = modelNamesPackageNames[typeName]
+				}
+			}
+		}
+
+		m.Properties["key"] = mapProperty
+
+		typeModel := &Model{}
+		if typeInnerModels, err := g.parseModel(typeModel, typeName, modelPackage, knownModelNames); err != nil {
+			//log.Printf("Parse Inner Model error %#v \n", err)
+			return nil, err
+		} else {
+			for _, property := range m.Properties {
+				if property.Type == "array" {
+					if property.Items.Ref == typeName {
+						property.Items.Ref = referenceLink(typeModel.Id)
+					}
+				} else {
+					if property.Type == typeName {
+						if translation, ok := typeDefTranslations[modelNamesPackageNames[typeName]]; ok {
+							if isBasicType(translation) {
+								if isBasicTypeOASType(translation) {
+									property.Type = basicTypesOASTypes[translation]
+								}
+								continue
+							}
+							// if indirectRef, ok := modelNamesPackageNames[translation]; ok {
+							// 	property.Ref = referenceLink(indirectRef)
+							// 	continue
+							// }
+						}
+						property.Ref = referenceLink(typeModel.Id)
+					} else {
+						// fmt.Println(property.Type, "<>", typeName)
+					}
+				}
+			}
+			//log.Printf("Inner model %v parsed, parsing %s \n", typeName, modelName)
+			if typeModel != nil {
+				innerModelList = append(innerModelList, typeModel)
+			}
+			if typeInnerModels != nil && len(typeInnerModels) > 0 {
+				innerModelList = append(innerModelList, typeInnerModels...)
+			}
+			//log.Printf("innerModelList: %#v\n, typeInnerModels: %#v, usedTypes: %#v \n", innerModelList, typeInnerModels, usedTypes)
+		}
 	}
 
 	//log.Printf("ParseModel finished %s \n", modelName)

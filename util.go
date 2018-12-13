@@ -131,6 +131,10 @@ func referenceLink(name string) string {
 	return "#/components/schemas/" + name
 }
 
+func trimeReferenceLinkPrefix(ref string) string {
+	return strings.TrimPrefix(ref, "#/components/schemas/")
+}
+
 func getTypeAsString(fieldType interface{}) string {
 	astArrayType, ok := fieldType.(*ast.ArrayType)
 	if ok {
