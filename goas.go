@@ -1287,6 +1287,8 @@ func (g *Goas) parseModelProperty(m *Model, field *ast.Field, modelPackage strin
 				property.Example, _ = strconv.Atoi(tag)
 			} else if strings.Contains(property.Type, "float") {
 				property.Example, _ = strconv.ParseFloat(tag, 64)
+			} else if b, err := strconv.ParseBool(tag); err == nil {
+				property.Example = b
 			} else if property.Type == "array" {
 				b, err := json.RawMessage(tag).MarshalJSON()
 				if err != nil {
