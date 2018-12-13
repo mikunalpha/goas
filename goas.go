@@ -994,6 +994,7 @@ func (g *Goas) parseModel(m *Model, modelName string, currentPackage string, kno
 	} else if astMapType, ok := astTypeSpec.Type.(*ast.MapType); ok {
 		m.Properties = map[string]*ModelProperty{}
 		mapProperty := &ModelProperty{}
+		m.Properties["key"] = mapProperty
 
 		typeName := fmt.Sprint(astMapType.Value)
 
@@ -1046,71 +1047,70 @@ func (g *Goas) parseModel(m *Model, modelName string, currentPackage string, kno
 					}
 				}
 			}
-		}
-
-		if _, exists := knownModelNames[typeName]; exists {
-			// fmt.Println("@", typeName)
-			if _, ok := modelNamesPackageNames[typeName]; ok {
-				if translation, ok := typeDefTranslations[modelNamesPackageNames[typeName]]; ok {
-					if isBasicType(translation) {
-						if isBasicTypeOASType(translation) {
-							// fmt.Println(modelNamesPackageNames[typeName], translation)
-							mapProperty.Type = basicTypesOASTypes[translation]
-						}
-						// continue
-					}
-				}
-				if mapProperty.Type != "array" {
-					mapProperty.Ref = referenceLink(modelNamesPackageNames[typeName])
-					// mapProperty.Ref = modelNamesPackageNames[typeName]
-				} else {
-					mapProperty.Items.Ref = referenceLink(modelNamesPackageNames[typeName])
-					// mapProperty.Items.Ref = modelNamesPackageNames[typeName]
-				}
-			}
-		}
-
-		m.Properties["key"] = mapProperty
-
-		typeModel := &Model{}
-		if typeInnerModels, err := g.parseModel(typeModel, typeName, modelPackage, knownModelNames); err != nil {
-			//log.Printf("Parse Inner Model error %#v \n", err)
-			return nil, err
 		} else {
-			for _, property := range m.Properties {
-				if property.Type == "array" {
-					if property.Items.Ref == typeName {
-						property.Items.Ref = referenceLink(typeModel.Id)
-					}
-				} else {
-					if property.Type == typeName {
-						if translation, ok := typeDefTranslations[modelNamesPackageNames[typeName]]; ok {
-							if isBasicType(translation) {
-								if isBasicTypeOASType(translation) {
-									property.Type = basicTypesOASTypes[translation]
-								}
-								continue
+			if _, exists := knownModelNames[typeName]; exists {
+				// fmt.Println("@", typeName)
+				if _, ok := modelNamesPackageNames[typeName]; ok {
+					if translation, ok := typeDefTranslations[modelNamesPackageNames[typeName]]; ok {
+						if isBasicType(translation) {
+							if isBasicTypeOASType(translation) {
+								// fmt.Println(modelNamesPackageNames[typeName], translation)
+								mapProperty.Type = basicTypesOASTypes[translation]
 							}
-							// if indirectRef, ok := modelNamesPackageNames[translation]; ok {
-							// 	property.Ref = referenceLink(indirectRef)
-							// 	continue
-							// }
+							// continue
 						}
-						property.Ref = referenceLink(typeModel.Id)
+					}
+					if mapProperty.Type != "array" {
+						mapProperty.Ref = referenceLink(modelNamesPackageNames[typeName])
+						// mapProperty.Ref = modelNamesPackageNames[typeName]
 					} else {
-						// fmt.Println(property.Type, "<>", typeName)
+						mapProperty.Items.Ref = referenceLink(modelNamesPackageNames[typeName])
+						// mapProperty.Items.Ref = modelNamesPackageNames[typeName]
 					}
 				}
 			}
-			//log.Printf("Inner model %v parsed, parsing %s \n", typeName, modelName)
-			if typeModel != nil {
-				innerModelList = append(innerModelList, typeModel)
+
+			typeModel := &Model{}
+			if typeInnerModels, err := g.parseModel(typeModel, typeName, modelPackage, knownModelNames); err != nil {
+				//log.Printf("Parse Inner Model error %#v \n", err)
+				return nil, err
+			} else {
+				for _, property := range m.Properties {
+					if property.Type == "array" {
+						if property.Items.Ref == typeName {
+							property.Items.Ref = referenceLink(typeModel.Id)
+						}
+					} else {
+						if property.Type == typeName {
+							if translation, ok := typeDefTranslations[modelNamesPackageNames[typeName]]; ok {
+								if isBasicType(translation) {
+									if isBasicTypeOASType(translation) {
+										property.Type = basicTypesOASTypes[translation]
+									}
+									continue
+								}
+								// if indirectRef, ok := modelNamesPackageNames[translation]; ok {
+								// 	property.Ref = referenceLink(indirectRef)
+								// 	continue
+								// }
+							}
+							property.Ref = referenceLink(typeModel.Id)
+						} else {
+							// fmt.Println(property.Type, "<>", typeName)
+						}
+					}
+				}
+				//log.Printf("Inner model %v parsed, parsing %s \n", typeName, modelName)
+				if typeModel != nil {
+					innerModelList = append(innerModelList, typeModel)
+				}
+				if typeInnerModels != nil && len(typeInnerModels) > 0 {
+					innerModelList = append(innerModelList, typeInnerModels...)
+				}
+				//log.Printf("innerModelList: %#v\n, typeInnerModels: %#v, usedTypes: %#v \n", innerModelList, typeInnerModels, usedTypes)
 			}
-			if typeInnerModels != nil && len(typeInnerModels) > 0 {
-				innerModelList = append(innerModelList, typeInnerModels...)
-			}
-			//log.Printf("innerModelList: %#v\n, typeInnerModels: %#v, usedTypes: %#v \n", innerModelList, typeInnerModels, usedTypes)
 		}
+
 	}
 
 	//log.Printf("ParseModel finished %s \n", modelName)
