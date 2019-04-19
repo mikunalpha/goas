@@ -1,4 +1,4 @@
-package goas
+package main
 
 const (
 	OpenAPIVersion = "3.0.0"
@@ -7,16 +7,11 @@ const (
 )
 
 type OASSpecObject struct {
-	OnpenAPI   string            `json:"openapi"`
-	Servers    []*ServerObject   `json:"servers"`
+	OpenAPI    string            `json:"openapi"`
 	Info       *InfoObject       `json:"info"`
+	Servers    []*ServerObject   `json:"servers"`
 	Paths      PathsObject       `json:"paths"`
 	Components *ComponentsOjbect `json:"components,omitempty"`
-}
-
-type ServerObject struct {
-	URL         string `json:"url"`
-	Description string `json:"description,omitempty"`
 }
 
 type InfoObject struct {
@@ -26,6 +21,11 @@ type InfoObject struct {
 	Contact        *ContactObject `json:"contact,omitempty"`
 	License        *LicenseObject `json:"license,omitempty"`
 	Version        string         `json:"version"`
+}
+
+type ServerObject struct {
+	URL         string `json:"url"`
+	Description string `json:"description,omitempty"`
 }
 
 type ContactObject struct {

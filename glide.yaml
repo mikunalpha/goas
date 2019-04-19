@@ -1,6 +1,0 @@
-package: github.com/mikunalpha/goas
-import:
-- package: github.com/gin-gonic/gin
-  version: ~1.2.0
-- package: github.com/urfave/cli
-  version: ~1.20.0

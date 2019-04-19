@@ -4,22 +4,26 @@ import (
 	"log"
 	"os"
 
-	"github.com/mikunalpha/goas"
 	"github.com/urfave/cli"
 )
 
-var version = "v0.5.0"
+var version = "v1.0.0"
 
 var flags = []cli.Flag{
 	cli.StringFlag{
-		Name:  "package",
+		Name:  "module-path",
 		Value: "",
-		Usage: "Goas will search @comment under the package",
+		Usage: "goas will search @comment under the module",
+	},
+	cli.StringFlag{
+		Name:  "main-file-path",
+		Value: "",
+		Usage: "goas will start to search @comment from this main file",
 	},
 	cli.StringFlag{
 		Name:  "output",
 		Value: "oas.json",
-		Usage: "Output file",
+		Usage: "output file",
 	},
 	cli.BoolFlag{
 		Name:  "debug",
@@ -28,20 +32,19 @@ var flags = []cli.Flag{
 }
 
 func action(c *cli.Context) error {
-	g := goas.New(c.GlobalString("package"))
-
-	if c.GlobalIsSet("debug") {
-		g.EnableDebug = true
+	p, err := newParser(c.GlobalString("module-path"), c.GlobalString("main-file-path"), c.GlobalBool("debug"))
+	if err != nil {
+		return err
 	}
-
-	return g.CreateOASFile(c.GlobalString("output"))
+	// fmt.Printf("%+v\n", p)
+	return p.CreateOASFile(c.GlobalString("output"))
 }
 
 func main() {
 	app := cli.NewApp()
 	app.Name = "goas"
 	app.Usage = ""
-	app.UsageText = "goas [options]"
+	// app.UsageText = "goas [options]"
 	app.Version = version
 	app.Copyright = "(c) 2018 mikun800527@gmail.com"
 	app.HideHelp = true

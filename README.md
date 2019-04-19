@@ -1,15 +1,18 @@
 # goas
-> Based on [yvasiyarov/swagger](https://github.com/yvasiyarov/swagger) repository.
+> The project is based on
+> [yvasiyarov/swagger](https://github.com/yvasiyarov/swagger) repository.
+> [uudashr/go-module](https://github.com/uudashr/go-module) repository.
 
 Generate [OpenAPI Specification](https://swagger.io/specification) json file with comments in Go.
 
 ## Limit
-Currently, only JSON supported
+- Only support go module.
+- Anonymous struct field is not supported.
 
 ## Install
 
 ```
-go get -u github.com/mikunalpha/goas/cmd/goas
+go get -u github.com/mikunalpha/goas
 ```
 
 ## Usage
@@ -30,7 +33,7 @@ Comments in main.go
 Comments for API handleFunc
 ```go
 type User struct {
-  Id   uint64 `json:"id" example:"100"`
+  Id   uint64 `json:"id" example:"100" description:"Use identity"`
   Name string `json:"name" example:"Mikun"` 
 }
 
@@ -71,5 +74,9 @@ func PostUser() {
 ```
 Go to the folder where is main.go in
 ```
-goas --package github.com/mikunalpha/goas/example --output oas.json
+// go.mod and main file are in the same directory
+goas --module-path . --output oas.json
+
+// go.mod and main file are in the different directory
+goas --module-path . --main-file-path ./cmd/xxx/main.go --output oas.json
 ```

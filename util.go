@@ -1,4 +1,4 @@
-package goas
+package main
 
 import (
 	"bufio"
@@ -9,16 +9,6 @@ import (
 	"strings"
 )
 
-func isInStringList(list []string, s string) bool {
-	for i, _ := range list {
-		if list[i] == s {
-			return true
-		}
-	}
-	return false
-}
-
-// Find 'package main' and 'func main()'
 func isMainFile(path string) bool {
 	f, err := os.Open(path)
 	if err != nil {
@@ -48,6 +38,39 @@ func isMainFile(path string) bool {
 	return isMainPackage && hasMainFunc
 }
 
+func getModuleNameFromGoMod(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	moduleName := ""
+
+	bs := bufio.NewScanner(f)
+	for bs.Scan() {
+		l := strings.TrimSpace(bs.Text())
+		if strings.HasPrefix(l, "module") {
+			moduleName = strings.TrimSpace(strings.TrimPrefix(l, "module"))
+			break
+		}
+	}
+	// if bs.Err() != nil {
+	// 	return ""
+	// }
+
+	return moduleName
+}
+
+func isInStringList(list []string, s string) bool {
+	for i, _ := range list {
+		if list[i] == s {
+			return true
+		}
+	}
+	return false
+}
+
 var basicTypes = map[string]bool{
 	"bool":       true,
 	"uint":       true,
@@ -69,7 +92,7 @@ var basicTypes = map[string]bool{
 	"rune":       true,
 	"uintptr":    true,
 	"error":      true,
-	// "Time":      true,
+	"Time":       true,
 	// "file":      true,
 	// "undefined": true,
 }
@@ -94,6 +117,7 @@ var basicTypesOASTypes = map[string]string{
 	"float32": "number",
 	"float64": "number",
 	"string":  "string",
+	"Time":    "string",
 	// "file":    "formData",
 }
 
@@ -117,6 +141,7 @@ var basicTypesOASFormats = map[string]string{
 	"float32": "float",
 	"float64": "double",
 	"string":  "string",
+	"Time":    "string",
 }
 
 var typeDefTranslations = map[string]string{}
