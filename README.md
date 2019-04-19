@@ -1,7 +1,7 @@
 # goas
-> The project is based on
-> [yvasiyarov/swagger](https://github.com/yvasiyarov/swagger) repository.
-> [uudashr/go-module](https://github.com/uudashr/go-module) repository.
+The project is based on  
+- [yvasiyarov/swagger](https://github.com/yvasiyarov/swagger) repository.  
+- [uudashr/go-module](https://github.com/uudashr/go-module) repository.
 
 Generate [OpenAPI Specification](https://swagger.io/specification) json file with comments in Go.
 
