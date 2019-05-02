@@ -1232,6 +1232,10 @@ func (p *parser) parseModelProperty(m *Model, field *ast.Field, modelPackage str
 		p.parseModel(innerModel, name, modelPackage, knownModelNames)
 
 		for innerFieldName, innerField := range innerModel.Properties {
+			_, exist := m.Properties[innerFieldName]
+			if exist {
+				continue
+			}
 			m.Properties[innerFieldName] = innerField
 		}
 
