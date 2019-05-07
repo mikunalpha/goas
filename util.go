@@ -85,6 +85,8 @@ var basicTypes = map[string]bool{
 	"int64":      true,
 	"float32":    true,
 	"float64":    true,
+	"number":     true, // OAS float32
+	"double":     true, // OAS float64
 	"string":     true,
 	"complex64":  true,
 	"complex128": true,
@@ -93,7 +95,6 @@ var basicTypes = map[string]bool{
 	"uintptr":    true,
 	"error":      true,
 	"Time":       true,
-	// "file":      true,
 	// "undefined": true,
 }
 
@@ -118,7 +119,6 @@ var basicTypesOASTypes = map[string]string{
 	"float64": "number",
 	"string":  "string",
 	"Time":    "string",
-	// "file":    "formData",
 }
 
 func isBasicTypeOASType(typeName string) bool {
@@ -128,7 +128,7 @@ func isBasicTypeOASType(typeName string) bool {
 
 var basicTypesOASFormats = map[string]string{
 	"bool":    "boolean",
-	"uint":    "integer",
+	"uint":    "int64",
 	"uint8":   "int64",
 	"uint16":  "int64",
 	"uint32":  "int64",

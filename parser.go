@@ -515,18 +515,56 @@ func (p *parser) parseOperation(operation *OperationObject, pkgPath, pkgName, co
 }
 
 func (p *parser) parseParamComment(pkgName string, operation *OperationObject, paramString string) error {
-	re := regexp.MustCompile(`([-\w]+)[\s]+([\w]+)[\s]+([\w.]+)[\s]+([\w]+)[\s]+"([^"]+)"`)
+	re := regexp.MustCompile(`([-\w]+)[\s]+([\w]+)[\s]+([\w./]+)[\s]+([\w]+)[\s]+"([^"]+)"`)
 	matches := re.FindStringSubmatch(paramString)
 	if len(matches) != 6 {
 		return fmt.Errorf("Can not parse param comment \"%s\", skipped", paramString)
 	}
+	parameter := &ParameterObject{}
+	parameter.Name = matches[1]
+	parameter.In = matches[2]
+
+	if parameter.In == "file" || parameter.In == "form" {
+		ContentTypeForm := "multipart/form-data"
+
+		requiredText := strings.ToLower(matches[4])
+
+		if operation.RequestBody == nil {
+			operation.RequestBody = &RequestBodyObject{
+				Content: map[string]*MediaTypeObject{
+					ContentTypeForm: &MediaTypeObject{
+						Schema: &SchemaObject{
+							Type:       "object",
+							Properties: map[string]interface{}{},
+						},
+					},
+				},
+				Required: (requiredText == "true" || requiredText == "required"),
+			}
+		}
+
+		if parameter.In == "file" {
+			operation.RequestBody.Content[ContentTypeForm].Schema.Properties[parameter.Name] = &SchemaObject{
+				Type:   "string",
+				Format: "binary",
+			}
+		} else {
+			typeName := matches[3]
+			if isBasicTypeOASType(typeName) {
+				operation.RequestBody.Content[ContentTypeForm].Schema.Properties[parameter.Name] = &SchemaObject{
+					Type:   basicTypesOASTypes[typeName],
+					Format: basicTypesOASFormats[typeName],
+				}
+			}
+		}
+
+		return nil
+	}
+
 	typeName, err := p.registerType(pkgName, matches[3])
 	if err != nil {
 		return err
 	}
-	parameter := &ParameterObject{}
-	parameter.Name = matches[1]
-	parameter.In = matches[2]
 
 	if parameter.In != "body" {
 		if isBasicTypeOASType(typeName) {
@@ -557,9 +595,11 @@ func (p *parser) parseParamComment(pkgName string, operation *OperationObject, p
 		return nil
 	}
 
-	operation.RequestBody = &RequestBodyObject{
-		Content:  map[string]*MediaTypeObject{},
-		Required: true,
+	if operation.RequestBody == nil {
+		operation.RequestBody = &RequestBodyObject{
+			Content:  map[string]*MediaTypeObject{},
+			Required: true,
+		}
 	}
 	operation.RequestBody.Content[ContentTypeJson] = &MediaTypeObject{}
 	_, ok := p.OASSpec.Components.Schemas[typeName]
@@ -1091,6 +1131,7 @@ func (p *parser) findModelDefinition(modelName string, pkgName string) (*ast.Typ
 		model = p.getModelDefinition(modelName, p.getPkgPathByPkgName(pkgName))
 		if model == nil {
 			fmt.Println(">>", pkgName, p.getPkgPathByPkgName(pkgName))
+			fmt.Println(">>>", modelName)
 			log.Fatalf("Can not find definition of %s model. Current package %s", modelName, pkgName)
 		}
 	} else {
@@ -1236,6 +1277,7 @@ func (p *parser) parseModelProperty(m *Model, field *ast.Field, modelPackage str
 			if exist {
 				continue
 			}
+			// fmt.Println("@@", m.Id, innerFieldName)
 			m.Properties[innerFieldName] = innerField
 		}
 
