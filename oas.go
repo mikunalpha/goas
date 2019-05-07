@@ -7,11 +7,12 @@ const (
 )
 
 type OASSpecObject struct {
-	OpenAPI    string            `json:"openapi"`
-	Info       *InfoObject       `json:"info"`
-	Servers    []*ServerObject   `json:"servers"`
-	Paths      PathsObject       `json:"paths"`
-	Components *ComponentsOjbect `json:"components,omitempty"`
+	OpenAPI    string                `json:"openapi"`
+	Info       *InfoObject           `json:"info"`
+	Servers    []*ServerObject       `json:"servers"`
+	Paths      PathsObject           `json:"paths"`
+	Components *ComponentsOjbect     `json:"components,omitempty"`
+	Security   []map[string][]string `json:"security,omitempty"`
 }
 
 type InfoObject struct {
@@ -148,7 +149,14 @@ type HeaderObject struct {
 }
 
 type ComponentsOjbect struct {
-	Schemas    map[string]*SchemaObject    `json:"schemas,omitempty"`
-	Responses  map[string]*ResponseObject  `json:"responses,omitempty"`
-	Parameters map[string]*ParameterObject `json:"parameters,omitempty"`
+	SecuritySchemes map[string]*SecuritySchemeObject `json:"securitySchemes,omitempty"`
+	Schemas         map[string]*SchemaObject         `json:"schemas,omitempty"`
+	Responses       map[string]*ResponseObject       `json:"responses,omitempty"`
+	Parameters      map[string]*ParameterObject      `json:"parameters,omitempty"`
+}
+
+type SecuritySchemeObject struct {
+	Type string `json:"type"`
+	Name string `json:"name"`
+	In   string `json:"in"`
 }

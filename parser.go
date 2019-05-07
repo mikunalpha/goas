@@ -194,6 +194,9 @@ func (p *parser) parseInfo() error {
 		Servers: []*ServerObject{{URL: "/"}},
 		Info:    &InfoObject{},
 		Paths:   map[string]*PathItemObject{},
+		Security: []map[string][]string{{
+			"authorizationHeader": []string{},
+		}},
 	}
 
 	fileTree, err := goparser.ParseFile(token.NewFileSet(), p.MainFilePath, nil, goparser.ParseComments)
@@ -762,6 +765,13 @@ func (p *parser) registerType(pkgName, typeName string) (string, error) {
 					Schemas:    map[string]*SchemaObject{},
 					Responses:  map[string]*ResponseObject{},
 					Parameters: map[string]*ParameterObject{},
+					SecuritySchemes: map[string]*SecuritySchemeObject{
+						"authorizationHeader": &SecuritySchemeObject{
+							Type: "apiKey",
+							In:   "header",
+							Name: "Authorization",
+						},
+					},
 				}
 			}
 			_, ok := p.OASSpec.Components.Schemas[registerType]
