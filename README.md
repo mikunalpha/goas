@@ -33,7 +33,7 @@ Comments in main.go
 Comments for API handleFunc
 ```go
 type User struct {
-  Id   uint64 `json:"id" example:"100" description:"Use identity"`
+  ID   uint64 `json:"id" example:"100" description:"User identity"`
   Name string `json:"name" example:"Mikun"` 
 }
 
@@ -52,11 +52,11 @@ type ErrorResponse struct {
 
 // @Title Get user list of a group.
 // @Description Get users related to a specific group.
-// @Param  group_id  path  int  true  "Id of a specific group."
-// @Success  200  {object}  UsersResponse  "UsersResponse JSON"
-// @Failure  400  {object}  ErrorResponse  "ErrorResponse JSON"
+// @Param  groupID  path  int  true  "Id of a specific group."
+// @Success  200  object  UsersResponse  "UsersResponse JSON"
+// @Failure  400  object  ErrorResponse  "ErrorResponse JSON"
 // @Resource users
-// @Router /api/group/{group_id}/users [get]
+// @Route /api/group/{groupID}/users [get]
 func GetGroupUsers() {
   // ...
 }
@@ -64,10 +64,10 @@ func GetGroupUsers() {
 // @Title Get user list of a group.
 // @Description Create a new user.
 // @Param  user  body  User  true  "Info of a user."
-// @Success  200  {object}  User           "UsersResponse JSON"
-// @Failure  400  {object}  ErrorResponse  "ErrorResponse JSON"
+// @Success  200  object  User           "UsersResponse JSON"
+// @Failure  400  object  ErrorResponse  "ErrorResponse JSON"
 // @Resource users
-// @Router /api/user [post]
+// @Route /api/user [post]
 func PostUser() {
   // ...
 }
@@ -80,3 +80,58 @@ goas --module-path . --output oas.json
 // go.mod and main file are in the different directory
 goas --module-path . --main-file-path ./cmd/xxx/main.go --output oas.json
 ```
+
+## HandleFunc Comments
+
+### Title & Description
+```
+@Title {title}
+@Title Get user list of a group.
+
+@Description {description}.
+@Description Get users related to a specific group.
+```
+- {title}: The title of the route.
+- {description}: The description of the route.
+
+### Parameter
+```
+@Param  {name}  {in}  {goType}  {required}  {description}
+@Param  user    body  User      true        "Info of a user."
+```
+- {name}: The parameter name.
+- {in}: The parameter is in `path`, `query`, `form`, `header`, `cookie`, `body` or `file`.
+- {goType}: The type in go code. This will be ignored when {in} is `file`.
+- {required}: `true`, `false`, `required` or `optional`. 
+- {description}: The description of the parameter. Must be quoted.
+
+### Response
+```
+@Success  {stauts}  {jsonType}  {goType}       {description}
+@Success  200       object      UsersResponse  "UsersResponse JSON"
+
+@Failure  {stauts}  {jsonType}  {goType}       {description}
+@Failure  400       object      ErrorResponse  "ErrorResponse JSON"
+```
+- {status}: The HTTP status code.
+- {jsonType}: The value can be `object` or `array`. 
+- {goType}: The type in go code.
+- {description}: The description of the response. Must be quoted.
+
+### Resource & Tag
+```
+@Resource {resource}
+@Resource users
+
+@Tag {tag}
+@tag xxx
+```
+- {resource}, {tag}: Tag of the route.
+
+### Route
+```
+@Route {path}    {method}
+@Route /api/user [post]
+```
+- {path}: The URL path.
+- {method}: The HTTP Method. Must be put in brackets.

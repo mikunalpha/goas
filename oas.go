@@ -3,16 +3,29 @@ package main
 const (
 	OpenAPIVersion = "3.0.0"
 
+	ContentTypeText = "text/plain"
 	ContentTypeJson = "application/json"
+	ContentTypeForm = "multipart/form-data"
 )
 
-type OASSpecObject struct {
-	OpenAPI    string                `json:"openapi"`
-	Info       *InfoObject           `json:"info"`
-	Servers    []*ServerObject       `json:"servers"`
-	Paths      PathsObject           `json:"paths"`
-	Components *ComponentsOjbect     `json:"components,omitempty"`
+type OpenAPIObject struct {
+	OpenAPI string         `json:"openapi"` // Required
+	Info    InfoObject     `json:"info"`    // Required
+	Servers []ServerObject `json:"servers,omitempty"`
+	Paths   PathsObject    `json:"paths"` // Required
+
+	Components ComponentsOjbect      `json:"components,omitempty"` // Required for Authorization header
 	Security   []map[string][]string `json:"security,omitempty"`
+
+	// Tags
+	// ExternalDocs
+}
+
+type ServerObject struct {
+	URL         string `json:"url"`
+	Description string `json:"description,omitempty"`
+
+	// Variables
 }
 
 type InfoObject struct {
@@ -22,11 +35,6 @@ type InfoObject struct {
 	Contact        *ContactObject `json:"contact,omitempty"`
 	License        *LicenseObject `json:"license,omitempty"`
 	Version        string         `json:"version"`
-}
-
-type ServerObject struct {
-	URL         string `json:"url"`
-	Description string `json:"description,omitempty"`
 }
 
 type ContactObject struct {
@@ -54,56 +62,48 @@ type PathItemObject struct {
 	Options     *OperationObject `json:"options,omitempty"`
 	Head        *OperationObject `json:"head,omitempty"`
 	Trace       *OperationObject `json:"trace,omitempty"`
-	// Servers []ServerObject `json:"servers,omitempty"`
-	Parameters []interface{} `json:"parameters,omitempty"`
+
+	// Servers
+	// Parameters
 }
 
 type OperationObject struct {
-	Tags        []string `json:"tags,omitempty"`
-	Summary     string   `json:"summary,omitempty"`
-	Description string   `json:"description,omitempty"`
-	// ExternalDocs *ExternalDocumentationObject `json:"externalDocs,omitempty"`
-	OperationId string                     `json:"operationId,omitempty"`
-	Parameters  []*ParameterObject         `json:"parameters,omitempty"`
-	RequestBody *RequestBodyObject         `json:"requestBody,omitempty"`
-	Responses   map[string]*ResponseObject `json:"responses,omitempty"`
-	// Callbacks Map[string, Callback Object | Reference Object] `json:"callbacks,omitempty"`
-	Deprecated bool `json:"deprecated,omitempty"`
-	// Security   []*SecurityRequirementObject `json:"security,omitempty"`
-	// Servers []ServerObject `json:"servers,omitempty"`
+	Responses ResponsesObject `json:"responses"` // Required
 
-	// parser       *Parser
-	packageName string
+	Tags        []string           `json:"tags,omitempty"`
+	Summary     string             `json:"summary,omitempty"`
+	Description string             `json:"description,omitempty"`
+	Parameters  []ParameterObject  `json:"parameters,omitempty"`
+	RequestBody *RequestBodyObject `json:"requestBody,omitempty"`
+
+	// Tags
+	// ExternalDocs
+	// OperationID
+	// Callbacks
+	// Deprecated
+	// Security
+	// Servers
 }
 
 type ParameterObject struct {
-	Name            string        `json:"name"`
-	In              string        `json:"in"`
-	Description     string        `json:"description,omitempty"`
-	Required        bool          `json:"required,omitempty"`
-	Deprecated      bool          `json:"deprecated,omitempty"`
-	AllowEmptyValue bool          `json:"allowEmptyValue,omitempty"`
-	Style           string        `json:"style,omitempty"`
-	Explode         bool          `json:"explode,omitempty"`
-	AllowReserved   bool          `json:"allowReserved,omitempty"`
-	Schema          *SchemaObject `json:"schema,omitempty"`
-	Example         string        `json:"example,omitempty"`
-	// Examples map[string]ExampleObject `json:"examples,omitempty"`
+	Name string `json:"name"` // Required
+	In   string `json:"in"`   // Required. Possible values are "query", "header", "path" or "cookie"
 
-	// Ref is for ReferenceObject
+	Description string        `json:"description,omitempty"`
+	Required    bool          `json:"required,omitempty"`
+	Example     interface{}   `json:"example,omitempty"`
+	Schema      *SchemaObject `json:"schema,omitempty"`
+
+	// Ref is used when ParameterOjbect is as a ReferenceObject
 	Ref string `json:"$ref,omitempty"`
-}
 
-type SchemaObject struct {
-	Type       string                 `json:"type,omitempty"`
-	Format     string                 `json:"format,omitempty"`
-	Required   []string               `json:"required,omitempty"`
-	Properties map[string]interface{} `json:"properties,omitempty"`
-	Items      *ReferenceObject       `json:"items,omitempty"`
-	Example    string                 `json:"example,omitempty"`
-
-	// Ref is for ReferenceObject
-	Ref string `json:"$ref,omitempty"`
+	// Deprecated
+	// AllowEmptyValue
+	// Style
+	// Explode
+	// AllowReserved
+	// Examples
+	// Content
 }
 
 type ReferenceObject struct {
@@ -111,52 +111,112 @@ type ReferenceObject struct {
 }
 
 type RequestBodyObject struct {
-	Description string                      `json:"description,omitempty"`
-	Content     map[string]*MediaTypeObject `json:"content"`
-	Required    bool                        `json:"required,omitempty"`
+	Content map[string]*MediaTypeObject `json:"content"` // Required
 
-	// Ref is for ReferenceObject
+	Description string `json:"description,omitempty"`
+	Required    bool   `json:"required,omitempty"`
+
+	// Ref is used when RequestBodyObject is as a ReferenceObject
 	Ref string `json:"$ref,omitempty"`
 }
 
 type MediaTypeObject struct {
-	Schema  *SchemaObject `json:"schema,omitempty"`
-	Example string        `json:"example,omitempty"`
-	// Examples map[string]ExampleObject `json:"examples,omitempty"`
-	Encoding map[string]*EncodingObject `json:"encoding,omitempty"`
+	Schema SchemaObject `json:"schema,omitempty"`
+	// Example string       `json:"example,omitempty"`
+
+	// Examples
+	// Encoding
 }
 
-type EncodingObject struct {
-	ContentType   string                   `json:"contentType,omitempty"`
-	Headers       map[string]*HeaderObject `json:"headers,omitempty"`
-	Style         string                   `json:"style,omitempty"`
-	Explode       bool                     `json:"explode,omitempty"`
-	AllowReserved bool                     `json:"allowReserved,omitempty"`
+type SchemaObject struct {
+	ID      string `json:"-"` // For goas
+	PkgName string `json:"-"` // For goas
+
+	Type        string                   `json:"type,omitempty"`
+	Format      string                   `json:"format,omitempty"`
+	Required    []string                 `json:"required,omitempty"`
+	Properties  map[string]*SchemaObject `json:"properties,omitempty"`
+	Description string                   `json:"description,omitempty"`
+	Items       *SchemaObject            `json:"items,omitempty"` // use ptr to prevent recursive error
+	Example     interface{}              `json:"example,omitempty"`
+
+	// Ref is used when SchemaObject is as a ReferenceObject
+	Ref string `json:"$ref,omitempty"`
+
+	// Title
+	// MultipleOf
+	// Maximum
+	// ExclusiveMaximum
+	// Minimum
+	// ExclusiveMinimum
+	// MaxLength
+	// MinLength
+	// Pattern
+	// MaxItems
+	// MinItems
+	// UniqueItems
+	// MaxProperties
+	// MinProperties
+	// Enum
+	// AllOf
+	// OneOf
+	// AnyOf
+	// Not
+	// AdditionalProperties
+	// Description
+	// Default
+	// Nullable
+	// ReadOnly
+	// WriteOnly
+	// XML
+	// ExternalDocs
+	// Deprecated
 }
+
+type ResponsesObject map[string]*ResponseObject // [status]ResponseObject
 
 type ResponseObject struct {
-	Description string                      `json:"description"`
-	Headers     map[string]*HeaderObject    `json:"headers,omitempty"`
-	Content     map[string]*MediaTypeObject `json:"content"`
+	Description string `json:"description"` // Required
+
+	Headers map[string]*HeaderObject    `json:"headers,omitempty"`
+	Content map[string]*MediaTypeObject `json:"content,omitempty"`
 
 	// Ref is for ReferenceObject
 	Ref string `json:"$ref,omitempty"`
+
+	// Links
 }
 
 type HeaderObject struct {
 	Description string `json:"description,omitempty"`
 	Type        string `json:"type,omitempty"`
+
+	// Ref is used when HeaderObject is as a ReferenceObject
+	Ref string `json:"$ref,omitempty"`
 }
 
 type ComponentsOjbect struct {
-	SecuritySchemes map[string]*SecuritySchemeObject `json:"securitySchemes,omitempty"`
 	Schemas         map[string]*SchemaObject         `json:"schemas,omitempty"`
-	Responses       map[string]*ResponseObject       `json:"responses,omitempty"`
-	Parameters      map[string]*ParameterObject      `json:"parameters,omitempty"`
+	SecuritySchemes map[string]*SecuritySchemeObject `json:"securitySchemes,omitempty"`
+
+	// Responses
+	// Parameters
+	// Examples
+	// RequestBodies
+	// Headers
+	// Links
+	// Callbacks
 }
 
 type SecuritySchemeObject struct {
-	Type string `json:"type"`
-	Name string `json:"name"`
-	In   string `json:"in"`
+	Type   string `json:"type"`   // Required
+	Scheme string `json:"scheme"` // Required
+
+	Description string `json:"description,omitempty"`
+
+	// Name
+	// In
+	// BearerFormat
+	// Flows
+	// OpenIDConnectURL
 }

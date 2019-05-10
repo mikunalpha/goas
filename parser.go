@@ -2,13 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"go/ast"
 	goparser "go/parser"
 	"go/token"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -18,7 +18,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/mikunalpha/goas/go-module"
+	"github.com/mikunalpha/go-module"
 )
 
 type parser struct {
@@ -29,16 +29,21 @@ type parser struct {
 
 	GoModFilePath string
 
-	RequirePkgs []pkg
-
 	GoModCachePath string
 
-	OASSpec *OASSpecObject
+	OpenAPI OpenAPIObject
 
-	TypeDefinitions map[string]map[string]*ast.TypeSpec
-	PkgCache        map[string]map[string]*ast.Package
-	PkgPathCache    map[string]string
-	PkgImports      map[string]map[string][]string
+	KnownPkgs     []pkg
+	KnownNamePkg  map[string]*pkg
+	KnownPathPkg  map[string]*pkg
+	KnownIDSchema map[string]*SchemaObject
+
+	TypeSpecs               map[string]map[string]*ast.TypeSpec
+	PkgPathAstPkgCache      map[string]map[string]*ast.Package
+	PkgNameImportedPkgAlias map[string]map[string][]string
+
+	// PkgPathCache    map[string]string
+	// PkgImports      map[string]map[string][]string
 
 	Debug bool
 }
@@ -50,11 +55,27 @@ type pkg struct {
 
 func newParser(modulePath, mainFilePath string, debug bool) (*parser, error) {
 	p := &parser{
-		TypeDefinitions: map[string]map[string]*ast.TypeSpec{},
-		PkgCache:        map[string]map[string]*ast.Package{},
-		PkgPathCache:    map[string]string{},
-		PkgImports:      map[string]map[string][]string{},
-		Debug:           debug,
+		KnownPkgs:               []pkg{},
+		KnownNamePkg:            map[string]*pkg{},
+		KnownPathPkg:            map[string]*pkg{},
+		KnownIDSchema:           map[string]*SchemaObject{},
+		TypeSpecs:               map[string]map[string]*ast.TypeSpec{},
+		PkgPathAstPkgCache:      map[string]map[string]*ast.Package{},
+		PkgNameImportedPkgAlias: map[string]map[string][]string{},
+		Debug:                   debug,
+	}
+	p.OpenAPI.OpenAPI = OpenAPIVersion
+	p.OpenAPI.Paths = make(PathsObject)
+	p.OpenAPI.Security = []map[string][]string{{
+		"AuthorizationHeader": []string{},
+	}}
+	p.OpenAPI.Components.Schemas = make(map[string]*SchemaObject)
+	p.OpenAPI.Components.SecuritySchemes = map[string]*SecuritySchemeObject{
+		"AuthorizationHeader": &SecuritySchemeObject{
+			Type:        "http",
+			Scheme:      "bearer",
+			Description: "Inuput your token",
+		},
 	}
 
 	// check modulePath is exist
@@ -179,7 +200,7 @@ func (p *parser) CreateOASFile(path string) error {
 	}
 	defer fd.Close()
 
-	output, err := json.MarshalIndent(p.OASSpec, "", "  ")
+	output, err := json.MarshalIndent(p.OpenAPI, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -189,84 +210,77 @@ func (p *parser) CreateOASFile(path string) error {
 }
 
 func (p *parser) parseInfo() error {
-	p.OASSpec = &OASSpecObject{
-		OpenAPI: OpenAPIVersion,
-		Servers: []*ServerObject{{URL: "/"}},
-		Info:    &InfoObject{},
-		Paths:   map[string]*PathItemObject{},
-		Security: []map[string][]string{{
-			"authorizationHeader": []string{},
-		}},
-	}
-
 	fileTree, err := goparser.ParseFile(token.NewFileSet(), p.MainFilePath, nil, goparser.ParseComments)
 	if err != nil {
-		return fmt.Errorf("Can not parse general API information: %v\n", err)
+		return fmt.Errorf("can not parse general API information: %v", err)
 	}
 	if fileTree.Comments != nil {
-		for _, comment := range fileTree.Comments {
-			for _, commentLine := range strings.Split(comment.Text(), "\n") {
-				attribute := strings.ToLower(strings.Split(commentLine, " ")[0])
-				value := strings.TrimSpace(commentLine[len(attribute):])
+		for i := range fileTree.Comments {
+			for _, comment := range strings.Split(fileTree.Comments[i].Text(), "\n") {
+				attribute := strings.ToLower(strings.Split(comment, " ")[0])
+				if len(attribute) == 0 || attribute[0] != '@' {
+					continue
+				}
+				value := strings.TrimSpace(comment[len(attribute):])
 				if len(value) == 0 {
 					continue
 				}
-				p.debug(commentLine)
+				// p.debug(attribute, value)
 				switch attribute {
 				case "@version":
-					p.OASSpec.Info.Version = value
+					p.OpenAPI.Info.Version = value
 				case "@title":
-					p.OASSpec.Info.Title = value
+					p.OpenAPI.Info.Title = value
 				case "@description":
-					p.OASSpec.Info.Description = value
+					p.OpenAPI.Info.Description = value
 				case "@termsofserviceurl":
-					p.OASSpec.Info.TermsOfService = value
+					p.OpenAPI.Info.TermsOfService = value
 				case "@contactname":
-					if p.OASSpec.Info.Contact == nil {
-						p.OASSpec.Info.Contact = &ContactObject{}
+					if p.OpenAPI.Info.Contact == nil {
+						p.OpenAPI.Info.Contact = &ContactObject{}
 					}
-					p.OASSpec.Info.Contact.Name = value
+					p.OpenAPI.Info.Contact.Name = value
 				case "@contactemail":
-					if p.OASSpec.Info.Contact == nil {
-						p.OASSpec.Info.Contact = &ContactObject{}
+					if p.OpenAPI.Info.Contact == nil {
+						p.OpenAPI.Info.Contact = &ContactObject{}
 					}
-					p.OASSpec.Info.Contact.Email = value
+					p.OpenAPI.Info.Contact.Email = value
 				case "@contacturl":
-					if p.OASSpec.Info.Contact == nil {
-						p.OASSpec.Info.Contact = &ContactObject{}
+					if p.OpenAPI.Info.Contact == nil {
+						p.OpenAPI.Info.Contact = &ContactObject{}
 					}
-					p.OASSpec.Info.Contact.URL = value
+					p.OpenAPI.Info.Contact.URL = value
 				case "@licensename":
-					if p.OASSpec.Info.License == nil {
-						p.OASSpec.Info.License = &LicenseObject{}
+					if p.OpenAPI.Info.License == nil {
+						p.OpenAPI.Info.License = &LicenseObject{}
 					}
-					p.OASSpec.Info.License.Name = value
+					p.OpenAPI.Info.License.Name = value
 				case "@licenseurl":
-					if p.OASSpec.Info.License == nil {
-						p.OASSpec.Info.License = &LicenseObject{}
+					if p.OpenAPI.Info.License == nil {
+						p.OpenAPI.Info.License = &LicenseObject{}
 					}
-					p.OASSpec.Info.License.URL = value
+					p.OpenAPI.Info.License.URL = value
 				case "@server":
 					fields := strings.Split(value, " ")
-					s := &ServerObject{URL: fields[0], Description: value[len(fields[0]):]}
-					p.OASSpec.Servers = append(p.OASSpec.Servers, s)
+					s := ServerObject{URL: fields[0], Description: value[len(fields[0]):]}
+					p.OpenAPI.Servers = append(p.OpenAPI.Servers, s)
 				}
 			}
 		}
 	}
 
-	if len(p.OASSpec.Servers) < 1 {
-		p.OASSpec.Servers = append(p.OASSpec.Servers, &ServerObject{URL: "/", Description: "Default Server URL"})
+	if len(p.OpenAPI.Servers) < 1 {
+		p.OpenAPI.Servers = append(p.OpenAPI.Servers, ServerObject{URL: "/", Description: "Default Server URL"})
 	}
 
-	if p.OASSpec.Info.Title == "" {
+	if p.OpenAPI.Info.Title == "" {
 		return fmt.Errorf("info.title cannot not be empty")
 	}
-	if p.OASSpec.Info.Version == "" {
+	if p.OpenAPI.Info.Version == "" {
 		return fmt.Errorf("info.version cannot not be empty")
 	}
-	for i := range p.OASSpec.Servers {
-		if p.OASSpec.Servers[i].URL == "" {
+	for i := range p.OpenAPI.Servers {
+		if p.OpenAPI.Servers[i].URL == "" {
 			return fmt.Errorf("servers[%d].url cannot not be empty", i)
 		}
 	}
@@ -277,12 +291,21 @@ func (p *parser) parseInfo() error {
 func (p *parser) parseModule() error {
 	walker := func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
+			if strings.HasPrefix(strings.Trim(strings.TrimPrefix(path, p.ModulePath), "/"), ".git") {
+				return nil
+			}
+			fns, err := filepath.Glob(filepath.Join(path, "*.go"))
+			if len(fns) == 0 || err != nil {
+				return nil
+			}
+			// p.debug(path)
 			name := filepath.Join(p.ModuleName, strings.TrimPrefix(path, p.ModulePath))
-			p.RequirePkgs = append(p.RequirePkgs, pkg{
+			p.KnownPkgs = append(p.KnownPkgs, pkg{
 				Name: name,
 				Path: path,
 			})
-			p.PkgPathCache[name] = path
+			p.KnownNamePkg[name] = &p.KnownPkgs[len(p.KnownPkgs)-1]
+			p.KnownPathPkg[path] = &p.KnownPkgs[len(p.KnownPkgs)-1]
 		}
 		return nil
 	}
@@ -309,156 +332,175 @@ func (p *parser) parseGoMod() error {
 			pathRunes = append(pathRunes, '!')
 			pathRunes = append(pathRunes, unicode.ToLower(v))
 		}
-		path := filepath.Join(p.GoModCachePath, string(pathRunes)+"@"+goMod.Requires[i].Version)
-		p.RequirePkgs = append(p.RequirePkgs, pkg{
-			Name: goMod.Requires[i].Path,
-			Path: path,
+		pkgName := goMod.Requires[i].Path
+		pkgPath := filepath.Join(p.GoModCachePath, string(pathRunes)+"@"+goMod.Requires[i].Version)
+		p.KnownPkgs = append(p.KnownPkgs, pkg{
+			Name: pkgName,
+			Path: pkgPath,
 		})
-		p.PkgPathCache[goMod.Requires[i].Path] = path
+		p.KnownNamePkg[pkgName] = &p.KnownPkgs[len(p.KnownPkgs)-1]
+		p.KnownPathPkg[pkgPath] = &p.KnownPkgs[len(p.KnownPkgs)-1]
+
+		walker := func(path string, info os.FileInfo, err error) error {
+			if info.IsDir() {
+				if strings.HasPrefix(strings.Trim(strings.TrimPrefix(path, p.ModulePath), "/"), ".git") {
+					return nil
+				}
+				fns, err := filepath.Glob(filepath.Join(path, "*.go"))
+				if len(fns) == 0 || err != nil {
+					return nil
+				}
+				// p.debug(path)
+				name := filepath.Join(pkgName, strings.TrimPrefix(path, pkgPath))
+				p.KnownPkgs = append(p.KnownPkgs, pkg{
+					Name: name,
+					Path: path,
+				})
+				p.KnownNamePkg[name] = &p.KnownPkgs[len(p.KnownPkgs)-1]
+				p.KnownPathPkg[path] = &p.KnownPkgs[len(p.KnownPkgs)-1]
+			}
+			return nil
+		}
+		filepath.Walk(pkgPath, walker)
 	}
 	if p.Debug {
-		for i := range p.RequirePkgs {
-			p.debug(p.RequirePkgs[i].Name)
-			p.debug(p.RequirePkgs[i].Path)
+		for i := range p.KnownPkgs {
+			p.debug(p.KnownPkgs[i].Name, "->", p.KnownPkgs[i].Path)
 		}
 	}
-
 	return nil
-}
-
-func (p *parser) parseAPIs() error {
-	err := p.parseTypeDefinitions()
-	if err != nil {
-		return err
-	}
-
-	err = p.parsePaths()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (p *parser) parseTypeDefinitions() error {
-	for i := range p.RequirePkgs {
-		pkgPath := p.RequirePkgs[i].Path
-
-		_, ok := p.TypeDefinitions[pkgPath]
-		if !ok {
-			p.TypeDefinitions[pkgPath] = map[string]*ast.TypeSpec{}
-		}
-		astPkgs, err := p.getPkgAst(pkgPath)
-		if err != nil {
-			return fmt.Errorf("Parse of %s package cause error: %s", pkgPath, err)
-		}
-		for _, astPackage := range astPkgs {
-			for _, astFile := range astPackage.Files {
-				for _, astDeclaration := range astFile.Decls {
-					if generalDeclaration, ok := astDeclaration.(*ast.GenDecl); ok && generalDeclaration.Tok == token.TYPE {
-						for _, astSpec := range generalDeclaration.Specs {
-							if typeSpec, ok := astSpec.(*ast.TypeSpec); ok {
-								p.TypeDefinitions[pkgPath][typeSpec.Name.String()] = typeSpec
-							}
-						}
-					}
-				}
-			}
-		}
-
-		p.parseImportStatements(pkgPath)
-	}
-
-	return nil
-}
-
-func (p *parser) parseImportStatements(pkgPath string) map[string]bool {
-	imports := map[string]bool{}
-	astPackages, err := p.getPkgAst(pkgPath)
-	if err != nil {
-		return nil
-	}
-
-	p.PkgImports[pkgPath] = map[string][]string{}
-	for _, astPackage := range astPackages {
-		for _, astFile := range astPackage.Files {
-			for _, astImport := range astFile.Imports {
-				importedPackageName := strings.Trim(astImport.Path.Value, "\"")
-				realPath := ""
-				for i := range p.RequirePkgs {
-					if p.RequirePkgs[i].Name == importedPackageName {
-						realPath = p.RequirePkgs[i].Path
-					}
-				}
-				if _, ok := p.TypeDefinitions[realPath]; !ok {
-					imports[importedPackageName] = true
-				}
-
-				// Deal with alias of imported package
-				var importedPackageAlias string
-				if astImport.Name != nil && astImport.Name.Name != "." && astImport.Name.Name != "_" {
-					importedPackageAlias = astImport.Name.Name
-				} else {
-					importPath := strings.Split(importedPackageName, "/")
-					importedPackageAlias = importPath[len(importPath)-1]
-				}
-
-				isExists := false
-				for _, v := range p.PkgImports[pkgPath][importedPackageAlias] {
-					if v == importedPackageName {
-						isExists = true
-					}
-				}
-				if !isExists {
-					p.PkgImports[pkgPath][importedPackageAlias] = append(p.PkgImports[pkgPath][importedPackageAlias], importedPackageName)
-				}
-			}
-		}
-	}
-	return imports
 }
 
 func (p *parser) getPkgAst(pkgPath string) (map[string]*ast.Package, error) {
-	if cache, ok := p.PkgCache[pkgPath]; ok {
+	if cache, ok := p.PkgPathAstPkgCache[pkgPath]; ok {
 		return cache, nil
+	}
+	ignoreFileFilter := func(info os.FileInfo) bool {
+		name := info.Name()
+		return !info.IsDir() && !strings.HasPrefix(name, ".") && strings.HasSuffix(name, ".go") && !strings.HasSuffix(name, "_test.go")
 	}
 	astPackages, err := goparser.ParseDir(token.NewFileSet(), pkgPath, ignoreFileFilter, goparser.ParseComments)
 	if err != nil {
 		return nil, err
 	}
-	p.PkgCache[pkgPath] = astPackages
-
+	p.PkgPathAstPkgCache[pkgPath] = astPackages
 	return astPackages, nil
 }
 
-func ignoreFileFilter(info os.FileInfo) bool {
-	name := info.Name()
-	return !info.IsDir() && !strings.HasPrefix(name, ".") && strings.HasSuffix(name, ".go") && !strings.HasSuffix(name, "_test.go")
+func (p *parser) parseAPIs() error {
+	err := p.parseImportStatements()
+	if err != nil {
+		return err
+	}
+
+	err = p.parseTypeSpecs()
+	if err != nil {
+		return err
+	}
+
+	// err = p.parsePaths()
+	// if err != nil {
+	// 	return err
+	// }
+
+	return p.parsePaths()
 }
 
-func (p *parser) parsePaths() error {
-	for i := range p.RequirePkgs {
-		pkgPath := p.RequirePkgs[i].Path
-		pkgName := p.RequirePkgs[i].Name
-		p.debugf("parsePaths with %s", pkgPath)
+func (p *parser) parseImportStatements() error {
+	for i := range p.KnownPkgs {
+		pkgPath := p.KnownPkgs[i].Path
+		pkgName := p.KnownPkgs[i].Name
 
 		astPkgs, err := p.getPkgAst(pkgPath)
 		if err != nil {
-			return fmt.Errorf("Parse of %s package cause error: %s", pkgPath, err)
+			return fmt.Errorf("parseImportStatements: parse of %s package cause error: %s", pkgPath, err)
+		}
+
+		p.PkgNameImportedPkgAlias[pkgName] = map[string][]string{}
+		for _, astPackage := range astPkgs {
+			for _, astFile := range astPackage.Files {
+				for _, astImport := range astFile.Imports {
+					importedPkgName := strings.Trim(astImport.Path.Value, "\"")
+					importedPkgAlias := ""
+
+					// _, known := p.KnownNamePkg[importedPkgName]
+					// if !known {
+					// 	p.debug("unknown", importedPkgName)
+					// }
+
+					if astImport.Name != nil && astImport.Name.Name != "." && astImport.Name.Name != "_" {
+						importedPkgAlias = astImport.Name.String()
+						// p.debug(importedPkgAlias, importedPkgName)
+					} else {
+						s := strings.Split(importedPkgName, "/")
+						importedPkgAlias = s[len(s)-1]
+					}
+
+					exist := false
+					for _, v := range p.PkgNameImportedPkgAlias[pkgName][importedPkgAlias] {
+						if v == importedPkgName {
+							exist = true
+							break
+						}
+					}
+					if !exist {
+						p.PkgNameImportedPkgAlias[pkgName][importedPkgAlias] = append(p.PkgNameImportedPkgAlias[pkgName][importedPkgAlias], importedPkgName)
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (p *parser) parseTypeSpecs() error {
+	for i := range p.KnownPkgs {
+		pkgPath := p.KnownPkgs[i].Path
+		pkgName := p.KnownPkgs[i].Name
+
+		_, ok := p.TypeSpecs[pkgName]
+		if !ok {
+			p.TypeSpecs[pkgName] = map[string]*ast.TypeSpec{}
+		}
+		astPkgs, err := p.getPkgAst(pkgPath)
+		if err != nil {
+			return fmt.Errorf("parseTypeSpecs: parse of %s package cause error: %s", pkgPath, err)
 		}
 		for _, astPackage := range astPkgs {
 			for _, astFile := range astPackage.Files {
-				for _, astDescription := range astFile.Decls {
-					switch astDeclaration := astDescription.(type) {
-					case *ast.FuncDecl:
-						operation := &OperationObject{
-							Responses: map[string]*ResponseObject{},
+				for _, astDeclaration := range astFile.Decls {
+					if astGenDeclaration, ok := astDeclaration.(*ast.GenDecl); ok && astGenDeclaration.Tok == token.TYPE {
+						// find type declaration
+						for _, astSpec := range astGenDeclaration.Specs {
+							if typeSpec, ok := astSpec.(*ast.TypeSpec); ok {
+								p.TypeSpecs[pkgName][typeSpec.Name.String()] = typeSpec
+							}
 						}
-						if astDeclaration.Doc != nil && astDeclaration.Doc.List != nil {
-							for _, comment := range astDeclaration.Doc.List {
-								err := p.parseOperation(operation, pkgPath, pkgName, comment.Text)
-								if err != nil {
-									return fmt.Errorf("can not parse comment for function: %v, package: %v, got error: %v", astDeclaration.Name.String(), pkgPath, err)
+					} else if astFuncDeclaration, ok := astDeclaration.(*ast.FuncDecl); ok {
+						// find type declaration in func, method
+						if astFuncDeclaration.Doc != nil && astFuncDeclaration.Doc.List != nil && astFuncDeclaration.Body != nil {
+							funcName := astFuncDeclaration.Name.String()
+							for _, astStmt := range astFuncDeclaration.Body.List {
+								if astDeclStmt, ok := astStmt.(*ast.DeclStmt); ok {
+									if astGenDeclaration, ok := astDeclStmt.Decl.(*ast.GenDecl); ok {
+										for _, astSpec := range astGenDeclaration.Specs {
+											if typeSpec, ok := astSpec.(*ast.TypeSpec); ok {
+												// type in func
+												if astFuncDeclaration.Recv == nil {
+													p.TypeSpecs[pkgName][strings.Join([]string{funcName, typeSpec.Name.String()}, "@")] = typeSpec
+													continue
+												}
+												// type in method
+												var recvTypeName string
+												if astStarExpr, ok := astFuncDeclaration.Recv.List[0].Type.(*ast.StarExpr); ok {
+													recvTypeName = fmt.Sprintf("%s", astStarExpr.X)
+												} else if astIdent, ok := astFuncDeclaration.Recv.List[0].Type.(*ast.Ident); ok {
+													recvTypeName = astIdent.String()
+												}
+												p.TypeSpecs[pkgName][strings.Join([]string{recvTypeName, funcName, typeSpec.Name.String()}, "@")] = typeSpec
+											}
+										}
+									}
 								}
 							}
 						}
@@ -471,924 +513,631 @@ func (p *parser) parsePaths() error {
 	return nil
 }
 
-func (p *parser) parseOperation(operation *OperationObject, pkgPath, pkgName, comment string) error {
-	if !strings.HasPrefix(pkgPath, p.ModulePath) {
-		// ignore this pkgPath
-		// p.debugf("parseOperation ignores %s", pkgPath)
-		return nil
-	}
-	commentLine := strings.TrimSpace(strings.TrimLeft(comment, "//"))
-	if len(commentLine) == 0 {
-		return nil
-	}
+func (p *parser) parsePaths() error {
+	for i := range p.KnownPkgs {
+		pkgPath := p.KnownPkgs[i].Path
+		pkgName := p.KnownPkgs[i].Name
+		// p.debug(pkgName, "->", pkgPath)
 
-	attribute := strings.Fields(commentLine)[0]
-	switch strings.ToLower(attribute) {
-	case "@title":
-		operation.Summary = strings.TrimSpace(commentLine[len(attribute):])
-	case "@description":
-		operation.Description = strings.TrimSpace(commentLine[len(attribute):])
-	case "@param":
-		p.debugf("parseOperation parse comment %s", comment)
-		err := p.parseParamComment(pkgName, operation, strings.TrimSpace(commentLine[len(attribute):]))
+		astPkgs, err := p.getPkgAst(pkgPath)
 		if err != nil {
-			return err
+			return fmt.Errorf("parsePaths: parse of %s package cause error: %s", pkgPath, err)
 		}
-	case "@success", "@failure":
-		err := p.parseResponseComment(pkgName, operation, strings.TrimSpace(commentLine[len(attribute):]))
-		if err != nil {
-			return err
-		}
-	case "@resource":
-		resource := strings.TrimSpace(commentLine[len(attribute):])
-		if resource == "" {
-			resource = "others"
-		}
-		if !isInStringList(operation.Tags, resource) {
-			operation.Tags = append(operation.Tags, resource)
-		}
-	case "@router":
-		err := p.parseRouteComment(operation, commentLine)
-		if err != nil {
-			return err
+		for _, astPackage := range astPkgs {
+			for _, astFile := range astPackage.Files {
+				for _, astDeclaration := range astFile.Decls {
+					if astFuncDeclaration, ok := astDeclaration.(*ast.FuncDecl); ok {
+						if astFuncDeclaration.Doc != nil && astFuncDeclaration.Doc.List != nil {
+							err = p.parseOperation(pkgPath, pkgName, astFuncDeclaration.Doc.List)
+							if err != nil {
+								return err
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 
 	return nil
 }
 
-func (p *parser) parseParamComment(pkgName string, operation *OperationObject, paramString string) error {
-	re := regexp.MustCompile(`([-\w]+)[\s]+([\w]+)[\s]+([\w./]+)[\s]+([\w]+)[\s]+"([^"]+)"`)
-	matches := re.FindStringSubmatch(paramString)
-	if len(matches) != 6 {
-		return fmt.Errorf("Can not parse param comment \"%s\", skipped", paramString)
+func (p *parser) parseOperation(pkgPath, pkgName string, astComments []*ast.Comment) error {
+	operation := &OperationObject{
+		Responses: map[string]*ResponseObject{},
 	}
-	parameter := &ParameterObject{}
-	parameter.Name = matches[1]
-	parameter.In = matches[2]
+	if !strings.HasPrefix(pkgPath, p.ModulePath) {
+		// ignore this pkgName
+		// p.debugf("parseOperation ignores %s", pkgPath)
+		return nil
+	}
+	var err error
+	for _, astComment := range astComments {
+		comment := strings.TrimSpace(strings.TrimLeft(astComment.Text, "/"))
+		if len(comment) == 0 {
+			return nil
+		}
+		attribute := strings.Fields(comment)[0]
+		switch strings.ToLower(attribute) {
+		case "@title":
+			operation.Summary = strings.TrimSpace(comment[len(attribute):])
+		case "@description":
+			operation.Description = strings.Join([]string{operation.Description, strings.TrimSpace(comment[len(attribute):])}, " ")
+		case "@param":
+			err = p.parseParamComment(pkgPath, pkgName, operation, strings.TrimSpace(comment[len(attribute):]))
+		case "@success", "@failure":
+			err = p.parseResponseComment(pkgPath, pkgName, operation, strings.TrimSpace(comment[len(attribute):]))
+		case "@resource", "@tag":
+			resource := strings.TrimSpace(comment[len(attribute):])
+			if resource == "" {
+				resource = "others"
+			}
+			if !isInStringList(operation.Tags, resource) {
+				operation.Tags = append(operation.Tags, resource)
+			}
+		case "@route", "@router":
+			err = p.parseRouteComment(operation, comment)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-	if parameter.In == "file" || parameter.In == "form" {
-		ContentTypeForm := "multipart/form-data"
+func (p *parser) parseParamComment(pkgPath, pkgName string, operation *OperationObject, comment string) error {
+	// {name}  {in}  {goType}  {required}  {description}
+	// user    body  User      true        "Info of a user."
+	// f       file  ignored   true        "Upload a file."
+	re := regexp.MustCompile(`([-\w]+)[\s]+([\w]+)[\s]+([\w./\[\]]+)[\s]+([\w]+)[\s]+"([^"]+)"`)
+	matches := re.FindStringSubmatch(comment)
+	if len(matches) != 6 {
+		return fmt.Errorf("parseParamComment can not parse param comment \"%s\"", comment)
+	}
+	name := matches[1]
+	in := matches[2]
 
-		requiredText := strings.ToLower(matches[4])
+	re = regexp.MustCompile(`\[\w*\]`)
+	goType := re.ReplaceAllString(matches[3], "[]")
 
+	required := false
+	switch strings.ToLower(matches[4]) {
+	case "true", "required":
+		required = true
+	}
+	description := matches[5]
+
+	// `file`, `form`
+	if in == "file" || in == "form" {
 		if operation.RequestBody == nil {
 			operation.RequestBody = &RequestBodyObject{
 				Content: map[string]*MediaTypeObject{
 					ContentTypeForm: &MediaTypeObject{
-						Schema: &SchemaObject{
+						Schema: SchemaObject{
 							Type:       "object",
-							Properties: map[string]interface{}{},
+							Properties: map[string]*SchemaObject{},
 						},
 					},
 				},
-				Required: (requiredText == "true" || requiredText == "required"),
+				Required: required,
 			}
 		}
-
-		if parameter.In == "file" {
-			operation.RequestBody.Content[ContentTypeForm].Schema.Properties[parameter.Name] = &SchemaObject{
-				Type:   "string",
-				Format: "binary",
+		if in == "file" {
+			operation.RequestBody.Content[ContentTypeForm].Schema.Properties[name] = &SchemaObject{
+				Type:        "string",
+				Format:      "binary",
+				Description: description,
 			}
-		} else {
-			typeName := matches[3]
-			if isBasicTypeOASType(typeName) {
-				operation.RequestBody.Content[ContentTypeForm].Schema.Properties[parameter.Name] = &SchemaObject{
-					Type:   basicTypesOASTypes[typeName],
-					Format: basicTypesOASFormats[typeName],
-				}
+		} else if isGoTypeOASType(goType) {
+			operation.RequestBody.Content[ContentTypeForm].Schema.Properties[name] = &SchemaObject{
+				Type:        goTypesOASTypes[goType],
+				Format:      goTypesOASFormats[goType],
+				Description: description,
 			}
 		}
-
 		return nil
 	}
 
-	typeName, err := p.registerType(pkgName, matches[3])
-	if err != nil {
-		return err
-	}
-
-	if parameter.In != "body" {
-		if isBasicTypeOASType(typeName) {
-			parameter.Schema = &SchemaObject{
-				Type:   basicTypesOASTypes[typeName],
-				Format: basicTypesOASFormats[typeName],
-			}
-		} else {
-			_, ok := p.OASSpec.Components.Schemas[typeName]
-			if ok {
-				parameter.Schema = &SchemaObject{
-					Ref: referenceLink(typeName),
-				}
-			} else {
-				parameter.Schema = &SchemaObject{
-					Type: typeName,
-				}
-			}
+	// `path`, `query`, `header`, `cookie`
+	if in != "body" {
+		parameterObject := ParameterObject{
+			Name:        name,
+			In:          in,
+			Description: description,
+			Required:    required,
 		}
-		requiredText := strings.ToLower(matches[4])
-		parameter.Required = (requiredText == "true" || requiredText == "required")
-		if parameter.In == "path" {
-			parameter.Required = true
+		if in == "path" {
+			parameterObject.Required = true
 		}
-		parameter.Description = matches[5]
-		operation.Parameters = append(operation.Parameters, parameter)
-
+		if goType == "time.Time" {
+			var err error
+			parameterObject.Schema, err = p.parseSchemaObject(pkgPath, pkgName, goType)
+			if err != nil {
+				p.debug("parseResponseComment cannot parse goType", goType)
+			}
+			operation.Parameters = append(operation.Parameters, parameterObject)
+		} else if isGoTypeOASType(goType) {
+			parameterObject.Schema = &SchemaObject{
+				Type:        goTypesOASTypes[goType],
+				Format:      goTypesOASFormats[goType],
+				Description: description,
+			}
+			operation.Parameters = append(operation.Parameters, parameterObject)
+		}
 		return nil
 	}
 
 	if operation.RequestBody == nil {
 		operation.RequestBody = &RequestBodyObject{
 			Content:  map[string]*MediaTypeObject{},
-			Required: true,
+			Required: required,
 		}
 	}
-	operation.RequestBody.Content[ContentTypeJson] = &MediaTypeObject{}
-	_, ok := p.OASSpec.Components.Schemas[typeName]
-	if ok {
-		operation.RequestBody.Content[ContentTypeJson].Schema = &SchemaObject{
-			Ref: referenceLink(typeName),
+
+	if strings.HasPrefix(goType, "[]") || strings.HasPrefix(goType, "map[]") || goType == "time.Time" {
+		schema, err := p.parseSchemaObject(pkgPath, pkgName, goType)
+		if err != nil {
+			p.debug("parseResponseComment cannot parse goType", goType)
+		}
+		operation.RequestBody.Content[ContentTypeJson] = &MediaTypeObject{
+			Schema: *schema,
 		}
 	} else {
-		operation.RequestBody.Content[ContentTypeJson].Schema = &SchemaObject{
-			Type: strings.Trim(matches[2], "{}"),
+		typeName, err := p.registerType(pkgPath, pkgName, matches[3])
+		if err != nil {
+			return err
 		}
-	}
-	if matches[2] == "{array}" {
-		operation.RequestBody.Content[ContentTypeJson].Schema = &SchemaObject{
-			Type: "array",
-			Items: &ReferenceObject{
-				Ref: referenceLink(typeName),
-				// Ref: typeName,
-			},
+		if isBasicGoType(typeName) {
+			operation.RequestBody.Content[ContentTypeJson] = &MediaTypeObject{
+				Schema: SchemaObject{
+					Type: "string",
+				},
+			}
+		} else {
+			operation.RequestBody.Content[ContentTypeJson] = &MediaTypeObject{
+				Schema: SchemaObject{
+					Ref: addSchemaRefLinkPrefix(typeName),
+				},
+			}
 		}
-	} else if operation.RequestBody.Content[ContentTypeJson].Schema.Ref == "" {
-		operation.RequestBody.Content[ContentTypeJson].Schema.Type = typeName
 	}
 
 	return nil
 }
 
-func (p *parser) parseRouteComment(operation *OperationObject, commentLine string) error {
-	sourceString := strings.TrimSpace(commentLine[len("@Router"):])
-
-	re := regexp.MustCompile(`([\w\.\/\-{}]+)[^\[]+\[([^\]]+)`)
-	var matches []string
-
-	matches = re.FindStringSubmatch(sourceString)
-	if len(matches) != 3 {
-		return fmt.Errorf("Can not parse router comment \"%s\", skipped", commentLine)
+func (p *parser) parseResponseComment(pkgPath, pkgName string, operation *OperationObject, comment string) error {
+	// {status}  {jsonType}  {goType}     {description}
+	// 201       object      models.User  "User Model"
+	re := regexp.MustCompile(`([\d]+)[\s]+([\w\{\}]+)[\s]+([\w\-\.\/\[\]]+)[^"]*(.*)?`)
+	matches := re.FindStringSubmatch(comment)
+	if len(matches) != 5 {
+		return fmt.Errorf("parseResponseComment can not parse response comment \"%s\"", comment)
 	}
 
-	_, ok := p.OASSpec.Paths[matches[1]]
+	status := matches[1]
+	_, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return fmt.Errorf("parseResponseComment: http status must be int, but got %s", status)
+	}
+	switch matches[2] {
+	case "object", "array", "{object}", "{array}":
+	default:
+		return fmt.Errorf("parseResponseComment: invalid jsonType %s", matches[2])
+	}
+	responseObject := &ResponseObject{
+		Content: map[string]*MediaTypeObject{},
+	}
+	responseObject.Description = strings.Trim(matches[4], "\"")
+
+	re = regexp.MustCompile(`\[\w*\]`)
+	goType := re.ReplaceAllString(matches[3], "[]")
+	if strings.HasPrefix(goType, "[]") || strings.HasPrefix(goType, "map[]") {
+		schema, err := p.parseSchemaObject(pkgPath, pkgName, goType)
+		if err != nil {
+			p.debug("parseResponseComment cannot parse goType", goType)
+		}
+		responseObject.Content[ContentTypeJson] = &MediaTypeObject{
+			Schema: *schema,
+		}
+	} else {
+		typeName, err := p.registerType(pkgPath, pkgName, matches[3])
+		if err != nil {
+			return err
+		}
+		if isBasicGoType(typeName) {
+			responseObject.Content[ContentTypeText] = &MediaTypeObject{
+				Schema: SchemaObject{
+					Type: "string",
+				},
+			}
+		} else {
+			responseObject.Content[ContentTypeJson] = &MediaTypeObject{
+				Schema: SchemaObject{
+					Ref: addSchemaRefLinkPrefix(typeName),
+				},
+			}
+		}
+	}
+	operation.Responses[status] = responseObject
+
+	return nil
+}
+
+func (p *parser) parseRouteComment(operation *OperationObject, comment string) error {
+	sourceString := strings.TrimSpace(comment[len("@Router"):])
+
+	// /path [method]
+	re := regexp.MustCompile(`([\w\.\/\-{}]+)[^\[]+\[([^\]]+)`)
+	matches := re.FindStringSubmatch(sourceString)
+	if len(matches) != 3 {
+		return fmt.Errorf("Can not parse router comment \"%s\", skipped", comment)
+	}
+
+	_, ok := p.OpenAPI.Paths[matches[1]]
 	if !ok {
-		p.OASSpec.Paths[matches[1]] = &PathItemObject{}
+		p.OpenAPI.Paths[matches[1]] = &PathItemObject{}
 	}
 
 	switch strings.ToUpper(matches[2]) {
-	case "GET":
-		if p.OASSpec.Paths[matches[1]].Get == nil {
-			p.OASSpec.Paths[matches[1]].Get = operation
-		}
-	case "POST":
-		if p.OASSpec.Paths[matches[1]].Post == nil {
-			p.OASSpec.Paths[matches[1]].Post = operation
-		}
-	case "PATCH":
-		if p.OASSpec.Paths[matches[1]].Patch == nil {
-			p.OASSpec.Paths[matches[1]].Patch = operation
-		}
-	case "PUT":
-		if p.OASSpec.Paths[matches[1]].Put == nil {
-			p.OASSpec.Paths[matches[1]].Put = operation
-		}
-	case "DELETE":
-		if p.OASSpec.Paths[matches[1]].Delete == nil {
-			p.OASSpec.Paths[matches[1]].Delete = operation
-		}
-	case "OPTIONS":
-		if p.OASSpec.Paths[matches[1]].Options == nil {
-			p.OASSpec.Paths[matches[1]].Options = operation
-		}
-	case "HEAD":
-		if p.OASSpec.Paths[matches[1]].Head == nil {
-			p.OASSpec.Paths[matches[1]].Head = operation
-		}
-	case "TRACE":
-		if p.OASSpec.Paths[matches[1]].Trace == nil {
-			p.OASSpec.Paths[matches[1]].Trace = operation
-		}
+	case http.MethodGet:
+		p.OpenAPI.Paths[matches[1]].Get = operation
+	case http.MethodPost:
+		p.OpenAPI.Paths[matches[1]].Post = operation
+	case http.MethodPatch:
+		p.OpenAPI.Paths[matches[1]].Patch = operation
+	case http.MethodPut:
+		p.OpenAPI.Paths[matches[1]].Put = operation
+	case http.MethodDelete:
+		p.OpenAPI.Paths[matches[1]].Delete = operation
+	case http.MethodOptions:
+		p.OpenAPI.Paths[matches[1]].Options = operation
+	case http.MethodHead:
+		p.OpenAPI.Paths[matches[1]].Head = operation
+	case http.MethodTrace:
+		p.OpenAPI.Paths[matches[1]].Trace = operation
 	}
 
 	return nil
 }
 
-func (p *parser) parseResponseComment(pkgName string, operation *OperationObject, commentLine string) error {
-	re := regexp.MustCompile(`([\d]+)[\s]+([\w\{\}]+)[\s]+([\w\-\.\/]+)[^"]*(.*)?`)
-	var matches []string
+func (p *parser) registerType(pkgPath, pkgName, typeName string) (string, error) {
+	var registerTypeName string
 
-	matches = re.FindStringSubmatch(commentLine)
-	if len(matches) != 5 {
-		return fmt.Errorf("Can not parse response comment \"%s\", skipped", commentLine)
-	}
-
-	var response *ResponseObject
-	var code int
-	code, err := strconv.Atoi(matches[1])
-	if err != nil {
-		return errors.New("Success http code must be int")
+	if isBasicGoType(typeName) {
+		registerTypeName = typeName
+	} else if _, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, typeName)]; ok {
+		return genSchemeaObjectID(pkgName, typeName), nil
 	} else {
-		operation.Responses[fmt.Sprint(code)] = &ResponseObject{
-			Content: map[string]*MediaTypeObject{},
-		}
-		response = operation.Responses[fmt.Sprint(code)]
-		response.Content[ContentTypeJson] = &MediaTypeObject{}
-	}
-	response.Description = strings.Trim(matches[4], "\"")
-
-	typeName, err := p.registerType(pkgName, matches[3])
-	if err != nil {
-		return err
-	}
-
-	_, ok := p.OASSpec.Components.Schemas[typeName]
-	if ok {
-		response.Content[ContentTypeJson].Schema = &SchemaObject{
-			Ref: referenceLink(typeName),
-			// Ref: typeName,
-		}
-	} else {
-		response.Content[ContentTypeJson].Schema = &SchemaObject{
-			Type: strings.Trim(matches[2], "{}"),
-		}
-	}
-
-	if matches[2] == "{array}" {
-		response.Content[ContentTypeJson].Schema = &SchemaObject{
-			Type: "array",
-			Items: &ReferenceObject{
-				Ref: referenceLink(typeName),
-				// Ref: typeName,
-			},
-		}
-	} else if response.Content[ContentTypeJson].Schema.Ref == "" {
-		response.Content[ContentTypeJson].Schema.Type = typeName
-	}
-
-	// output, err := json.MarshalIndent(response, "", "  ")
-	// fmt.Println(string(output))
-
-	return nil
-}
-
-func (p *parser) registerType(pkgName, typeName string) (string, error) {
-	registerType := ""
-	translation, ok := typeDefTranslations[typeName]
-	if ok {
-		registerType = translation
-	} else if isBasicType(typeName) {
-		registerType = typeName
-	} else {
-		model := &Model{}
-		knownModelNames := map[string]bool{}
-		innerModels, err := p.parseModel(model, typeName, pkgName, knownModelNames)
+		schemaObject, err := p.parseSchemaObject(pkgPath, pkgName, typeName)
 		if err != nil {
-			return registerType, err
+			return "", err
 		}
-		if translation, ok := typeDefTranslations[typeName]; ok {
-			registerType = translation
-		} else {
-			registerType = model.Id
-			if p.OASSpec.Components == nil {
-				p.OASSpec.Components = &ComponentsOjbect{
-					Schemas:    map[string]*SchemaObject{},
-					Responses:  map[string]*ResponseObject{},
-					Parameters: map[string]*ParameterObject{},
-					SecuritySchemes: map[string]*SecuritySchemeObject{
-						"authorizationHeader": &SecuritySchemeObject{
-							Type: "apiKey",
-							In:   "header",
-							Name: "Authorization",
-						},
-					},
-				}
-			}
-			_, ok := p.OASSpec.Components.Schemas[registerType]
-			if !ok {
-				p.OASSpec.Components.Schemas[registerType] = &SchemaObject{
-					Type:       "object",
-					Required:   model.Required,
-					Properties: map[string]interface{}{},
-				}
-			}
-			for k, v := range model.Properties {
-				if v.Ref != "" {
-					v.Type = ""
-					v.Items = nil
-					v.Format = ""
-				}
-				p.OASSpec.Components.Schemas[registerType].Properties[k] = v
-			}
-			for _, m := range innerModels {
-				registerType := m.Id
-				if m.Ref != "" {
-					if _, ok := p.OASSpec.Components.Schemas[registerType]; !ok {
-						p.OASSpec.Components.Schemas[registerType] = &SchemaObject{
-							Ref: m.Ref,
-						}
-					}
-					continue
-				}
-				if _, ok := p.OASSpec.Components.Schemas[registerType]; !ok {
-					p.OASSpec.Components.Schemas[registerType] = &SchemaObject{
-						Type:       "object",
-						Required:   m.Required,
-						Properties: map[string]interface{}{},
-					}
-				}
-				for k, v := range m.Properties {
-					if v.Ref != "" {
-						v.Type = ""
-						v.Items = nil
-						v.Format = ""
-					}
-					if v.Example != nil {
-						v.Ref = ""
-						// fmt.Println(m.Id, k, "type", t)
-						example, ok := v.Example.(string)
-						if ok {
-							if strings.HasPrefix(example, "{") {
-								b, err := json.RawMessage(example).MarshalJSON()
-								if err != nil {
-									v.Example = "invalid example"
-								} else {
-									mapOfInterface := map[string]interface{}{}
-									err := json.Unmarshal(b, &mapOfInterface)
-									if err != nil {
-										v.Example = "invalid example"
-									} else {
-										v.Example = mapOfInterface
-									}
-								}
-							}
-						}
-					}
-					p.OASSpec.Components.Schemas[registerType].Properties[k] = v
-				}
-			}
+		registerTypeName = schemaObject.ID
+		_, ok := p.OpenAPI.Components.Schemas[registerTypeName]
+		if !ok {
+			p.OpenAPI.Components.Schemas[registerTypeName] = schemaObject
 		}
 	}
-
-	return registerType, nil
+	return registerTypeName, nil
 }
 
-type Model struct {
-	Ref        string                    `json:"$ref,omitempty"`
-	Id         string                    `json:"id,omitempty"`
-	Required   []string                  `json:"required,omitempty"`
-	Properties map[string]*ModelProperty `json:"properties,omitempty"`
-}
+func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaObject, error) {
+	var typeSpec *ast.TypeSpec
+	var exist bool
+	var schemaObject SchemaObject
+	var err error
 
-type ModelProperty struct {
-	Ref         string              `json:"$ref,omitempty"`
-	Type        string              `json:"type,omitempty"`
-	Description string              `json:"description,omitempty"`
-	Format      string              `json:"format,omitempty"`
-	Items       *ModelPropertyItems `json:"items,omitempty"`
-	Example     interface{}         `json:"example,omitempty"`
-}
-
-type ModelPropertyItems struct {
-	Ref  string `json:"$ref,omitempty"`
-	Type string `json:"type,omitempty"`
-}
-
-func (p *parser) parseModel(m *Model, modelName string, pkgName string, knownModelNames map[string]bool) ([]*Model, error) {
-	knownModelNames[modelName] = true
-	astTypeSpec, modelPackage := p.findModelDefinition(modelName, pkgName)
-	modelNameParts := strings.Split(modelName, ".")
-	m.Id = strings.Join(append(strings.Split(modelPackage, "/"), modelNameParts[len(modelNameParts)-1]), ".")
-	_, ok := modelNamesPackageNames[modelName]
-	if !ok {
-		modelNamesPackageNames[modelName] = m.Id
-	}
-	var innerModelList []*Model
-	astTypeDef, ok := astTypeSpec.Type.(*ast.Ident)
-	if ok {
-		typeDefTranslations[m.Id] = astTypeDef.Name
-		if modelRef, ok := modelNamesPackageNames[astTypeDef.Name]; ok {
-			m.Ref = modelRef
-		} else {
-			var err error
-			typeModel := &Model{}
-			innerModelList, err = p.parseModel(typeModel, astTypeDef.Name, modelPackage, knownModelNames)
-			if err != nil {
-				p.debugf("parse model %s failed: %s\n", astTypeDef.Name, err)
-			} else {
-				innerModelList = append(innerModelList, typeModel)
-			}
+	// handler basic and some specific typeName
+	if strings.HasPrefix(typeName, "[]") {
+		schemaObject.Type = "array"
+		itemTypeName := typeName[2:]
+		schemaObject.Items, err = p.parseSchemaObject(pkgPath, pkgName, itemTypeName)
+		if err != nil {
+			return nil, err
 		}
-		if modelRef, ok := modelNamesPackageNames[astTypeDef.Name]; ok {
-			m.Ref = referenceLink(modelRef)
+		return &schemaObject, nil
+	} else if strings.HasPrefix(typeName, "map[]") {
+		schemaObject.Type = "object"
+		itemTypeName := typeName[5:]
+		schemaProperty, err := p.parseSchemaObject(pkgPath, pkgName, itemTypeName)
+		if err != nil {
+			return nil, err
 		}
-	} else if astStructType, ok := astTypeSpec.Type.(*ast.StructType); ok {
-		p.parseFieldList(m, astStructType.Fields.List, modelPackage)
-		usedTypes := map[string]bool{}
-
-		for _, property := range m.Properties {
-			typeName := property.Type
-			if isBasicType(property.Format) {
-				typeName = property.Format
-				// log.Printf("%s %+v", m.Id, *property)
-			}
-			if typeName == "array" {
-				if property.Items.Type != "" {
-					typeName = property.Items.Type
-				} else {
-					typeName = property.Items.Ref
-				}
-			}
-			if translation, ok := typeDefTranslations[typeName]; ok {
-				typeName = translation
-			}
-			if isBasicType(typeName) {
-				if isBasicTypeOASType(typeName) {
-					property.Format = basicTypesOASFormats[typeName]
-					if property.Type != "array" {
-						property.Type = basicTypesOASTypes[typeName]
-					} else {
-						if isBasicType(property.Items.Type) {
-							if isBasicTypeOASType(property.Items.Type) {
-								property.Items.Type = basicTypesOASTypes[property.Items.Type]
-							}
-						}
-					}
-				}
-				continue
-			}
-			// if g.isImplementMarshalInterface(typeName) {
-			// 	continue
-			// }
-			if _, exists := knownModelNames[typeName]; exists {
-				// fmt.Println("@", typeName)
-				if _, ok := modelNamesPackageNames[typeName]; ok {
-					if translation, ok := typeDefTranslations[modelNamesPackageNames[typeName]]; ok {
-						if isBasicType(translation) {
-							if isBasicTypeOASType(translation) {
-								// fmt.Println(modelNamesPackageNames[typeName], translation)
-								property.Type = basicTypesOASTypes[translation]
-							}
-							continue
-						}
-					}
-					if property.Type != "array" {
-						property.Ref = referenceLink(modelNamesPackageNames[typeName])
-						// property.Ref = modelNamesPackageNames[typeName]
-					} else {
-						property.Items.Ref = referenceLink(modelNamesPackageNames[typeName])
-						// property.Items.Ref = modelNamesPackageNames[typeName]
-					}
-				}
-				continue
-			}
-
-			usedTypes[typeName] = true
-		}
-
-		// log.Printf("Before parse inner model list: %#v\n (%s)", usedTypes, modelName)
-		// innerModelList = []*Model{}
-
-		for typeName := range usedTypes {
-			typeModel := &Model{}
-			if typeInnerModels, err := p.parseModel(typeModel, typeName, modelPackage, knownModelNames); err != nil {
-				//log.Printf("Parse Inner Model error %#v \n", err)
-				return nil, err
-			} else {
-				for _, property := range m.Properties {
-					if property.Type == "array" {
-						if property.Items.Ref == typeName {
-							property.Items.Ref = referenceLink(typeModel.Id)
-						}
-					} else {
-						if property.Type == typeName {
-							if translation, ok := typeDefTranslations[modelNamesPackageNames[typeName]]; ok {
-								if isBasicType(translation) {
-									if isBasicTypeOASType(translation) {
-										property.Type = basicTypesOASTypes[translation]
-									}
-									continue
-								}
-								// if indirectRef, ok := modelNamesPackageNames[translation]; ok {
-								// 	property.Ref = referenceLink(indirectRef)
-								// 	continue
-								// }
-							}
-							property.Ref = referenceLink(typeModel.Id)
-						} else {
-							// fmt.Println(property.Type, "<>", typeName)
-						}
-					}
-				}
-				//log.Printf("Inner model %v parsed, parsing %s \n", typeName, modelName)
-				if typeModel != nil {
-					innerModelList = append(innerModelList, typeModel)
-				}
-				if typeInnerModels != nil && len(typeInnerModels) > 0 {
-					innerModelList = append(innerModelList, typeInnerModels...)
-				}
-				//log.Printf("innerModelList: %#v\n, typeInnerModels: %#v, usedTypes: %#v \n", innerModelList, typeInnerModels, usedTypes)
-			}
-		}
-		// log.Printf("After parse inner model list: %#v\n (%s)", usedTypes, modelName)
-		// log.Fatalf("Inner model list: %#v\n", innerModelList)
-
-	} else if astMapType, ok := astTypeSpec.Type.(*ast.MapType); ok {
-		m.Properties = map[string]*ModelProperty{}
-		mapProperty := &ModelProperty{}
-		m.Properties["key"] = mapProperty
-
-		typeName := fmt.Sprint(astMapType.Value)
-
-		reInternalIndirect := regexp.MustCompile("&\\{(\\w*) <nil> (\\w*)\\}")
-		typeName = string(reInternalIndirect.ReplaceAll([]byte(typeName), []byte("[]$2")))
-
-		reInternalRepresentation := regexp.MustCompile("&\\{(\\w*) (\\w*)\\}")
-		typeName = string(reInternalRepresentation.ReplaceAll([]byte(typeName), []byte("$1.$2")))
-
-		if strings.HasPrefix(typeName, "[]") {
-			mapProperty.Type = "array"
-			p.setItemType(mapProperty, typeName[2:])
-			// if is Unsupported item type of list, ignore this mapProperty
-			if mapProperty.Items.Type == "undefined" {
-				mapProperty = nil
-			}
-		} else if strings.HasPrefix(typeName, "map[]") {
-			mapProperty.Type = "map"
-		} else if typeName == "time.Time" {
-			mapProperty.Type = "Time"
-		} else {
-			mapProperty.Type = typeName
-		}
-		typeName = mapProperty.Type
-
-		// fmt.Println(mapProperty.Items.Type)
-
-		if typeName == "array" {
-			// mapProperty.Items = &ModelPropertyItems{}
-			if mapProperty.Items.Type != "" {
-				typeName = mapProperty.Items.Type
-			} else {
-				typeName = mapProperty.Items.Ref
-			}
-		}
-		if translation, ok := typeDefTranslations[typeName]; ok {
-			typeName = translation
-		}
-
-		if isBasicType(typeName) {
-			if isBasicTypeOASType(typeName) {
-				if mapProperty.Type != "array" {
-					mapProperty.Format = basicTypesOASFormats[typeName]
-					mapProperty.Type = basicTypesOASTypes[typeName]
-				} else {
-					if isBasicType(mapProperty.Items.Type) {
-						if isBasicTypeOASType(mapProperty.Items.Type) {
-							mapProperty.Items.Type = basicTypesOASTypes[mapProperty.Items.Type]
-						}
-					}
-				}
-			}
-		} else {
-			if _, exists := knownModelNames[typeName]; exists {
-				// fmt.Println("@", typeName)
-				if _, ok := modelNamesPackageNames[typeName]; ok {
-					if translation, ok := typeDefTranslations[modelNamesPackageNames[typeName]]; ok {
-						if isBasicType(translation) {
-							if isBasicTypeOASType(translation) {
-								// fmt.Println(modelNamesPackageNames[typeName], translation)
-								mapProperty.Type = basicTypesOASTypes[translation]
-							}
-							// continue
-						}
-					}
-					if mapProperty.Type != "array" {
-						mapProperty.Ref = referenceLink(modelNamesPackageNames[typeName])
-						// mapProperty.Ref = modelNamesPackageNames[typeName]
-					} else {
-						mapProperty.Items.Ref = referenceLink(modelNamesPackageNames[typeName])
-						// mapProperty.Items.Ref = modelNamesPackageNames[typeName]
-					}
-				}
-			}
-
-			typeModel := &Model{}
-			if typeInnerModels, err := p.parseModel(typeModel, typeName, modelPackage, knownModelNames); err != nil {
-				//log.Printf("Parse Inner Model error %#v \n", err)
-				return nil, err
-			} else {
-				for _, property := range m.Properties {
-					if property.Type == "array" {
-						if property.Items.Ref == typeName {
-							property.Items.Ref = referenceLink(typeModel.Id)
-						}
-					} else {
-						if property.Type == typeName {
-							if translation, ok := typeDefTranslations[modelNamesPackageNames[typeName]]; ok {
-								if isBasicType(translation) {
-									if isBasicTypeOASType(translation) {
-										property.Type = basicTypesOASTypes[translation]
-									}
-									continue
-								}
-								// if indirectRef, ok := modelNamesPackageNames[translation]; ok {
-								// 	property.Ref = referenceLink(indirectRef)
-								// 	continue
-								// }
-							}
-							property.Ref = referenceLink(typeModel.Id)
-						} else {
-							// fmt.Println(property.Type, "<>", typeName)
-						}
-					}
-				}
-				//log.Printf("Inner model %v parsed, parsing %s \n", typeName, modelName)
-				if typeModel != nil {
-					innerModelList = append(innerModelList, typeModel)
-				}
-				if typeInnerModels != nil && len(typeInnerModels) > 0 {
-					innerModelList = append(innerModelList, typeInnerModels...)
-				}
-				//log.Printf("innerModelList: %#v\n, typeInnerModels: %#v, usedTypes: %#v \n", innerModelList, typeInnerModels, usedTypes)
-			}
-		}
-
+		schemaObject.Properties = map[string]*SchemaObject{"key": schemaProperty}
+		return &schemaObject, nil
+	} else if typeName == "time.Time" {
+		schemaObject.Type = "string"
+		schemaObject.Format = "date-time"
+		return &schemaObject, nil
+	} else if strings.HasPrefix(typeName, "interface{}") {
+		return &schemaObject, nil
+	} else if isGoTypeOASType(typeName) {
+		schemaObject.Type = goTypesOASTypes[typeName]
+		return &schemaObject, nil
 	}
 
-	//log.Printf("ParseModel finished %s \n", modelName)
-	return innerModelList, nil
-}
-
-func (p *parser) findModelDefinition(modelName string, pkgName string) (*ast.TypeSpec, string) {
-	var model *ast.TypeSpec
-	var modelPackage string
-
-	modelNameParts := strings.Split(modelName, ".")
-
-	// if no dot in name - it can be only model from current package
-	if len(modelNameParts) == 1 {
-		modelPackage = pkgName
-		model = p.getModelDefinition(modelName, p.getPkgPathByPkgName(pkgName))
-		if model == nil {
-			fmt.Println(">>", pkgName, p.getPkgPathByPkgName(pkgName))
-			fmt.Println(">>>", modelName)
-			log.Fatalf("Can not find definition of %s model. Current package %s", modelName, pkgName)
+	// handler other type
+	typeNameParts := strings.Split(typeName, ".")
+	if len(typeNameParts) == 1 {
+		typeSpec, exist = p.getTypeSpec(pkgPath, pkgName, typeName)
+		if !exist {
+			log.Fatalf("Can not find definition of %s ast.TypeSpec. Current package %s", typeName, pkgName)
 		}
+		schemaObject.PkgName = pkgName
+		schemaObject.ID = genSchemeaObjectID(pkgName, typeName)
+		p.KnownIDSchema[schemaObject.ID] = &schemaObject
 	} else {
-		// // First try to assume what name is absolute
-		absolutePackageName := strings.Join(modelNameParts[:len(modelNameParts)-1], "/")
-		modelNameFromPath := modelNameParts[len(modelNameParts)-1]
-
-		// for k := range p.TypeDefinitions {
-		// 	p.debug("kkk ", k)
-		// }
-
-		modelPackage = absolutePackageName
-		model = p.getModelDefinition(modelNameFromPath, absolutePackageName)
-		if model == nil {
-			// 	// Can not get model by absolute name.
-			if len(modelNameParts) > 2 {
-				log.Fatalf("Can not find definition of %s model. Name looks like absolute, but model not found in %s", modelNameFromPath, pkgName)
+		guessPkgName := strings.Join(typeNameParts[:len(typeNameParts)-1], "/")
+		guessPkgPath := ""
+		for i := range p.KnownPkgs {
+			if guessPkgName == p.KnownPkgs[i].Name {
+				guessPkgPath = p.KnownPkgs[i].Path
+				break
 			}
-
-			// Lets try to find it in imported packages
-			imports, ok := p.PkgImports[p.getPkgPathByPkgName(pkgName)]
-			if !ok {
-				log.Fatalf("Can not find definition of %s model. Package %s dont import anything", modelNameFromPath, pkgName)
-			}
-			relativePackage, ok := imports[modelNameParts[0]]
-			if !ok {
-				log.Fatalf("Package %s is not imported to %s, Imported: %#v\n", modelNameParts[0], pkgName, imports)
-			}
-
-			var modelFound bool
-			for _, packageName := range relativePackage {
-				realPath := ""
-				for i := range p.RequirePkgs {
-					if p.RequirePkgs[i].Name == packageName {
-						realPath = p.RequirePkgs[i].Path
-					}
-				}
-				model = p.getModelDefinition(modelNameFromPath, realPath)
-				if model != nil {
-					modelPackage = packageName
-					modelFound = true
+		}
+		guessTypeName := typeNameParts[len(typeNameParts)-1]
+		typeSpec, exist = p.getTypeSpec(guessPkgName, guessPkgName, guessTypeName)
+		if !exist {
+			found := false
+			for k := range p.PkgNameImportedPkgAlias[pkgName] {
+				if k == guessPkgName && len(p.PkgNameImportedPkgAlias[pkgName][guessPkgName]) != 0 {
+					found = true
 					break
 				}
 			}
-			if !modelFound {
-				p.debug(imports[modelNameParts[0]])
-				p.debug(p.TypeDefinitions)
-				log.Fatalf("Can not find definition of %s model in package %s", modelNameFromPath, relativePackage)
+			if !found {
+				p.debugf("unknown guess %s ast.TypeSpec in package %s", guessTypeName, guessPkgName)
+				return &schemaObject, nil
 			}
-		}
-	}
-
-	return model, modelPackage
-}
-
-func (p *parser) getModelDefinition(model string, pkgName string) *ast.TypeSpec {
-	packageModels, ok := p.TypeDefinitions[pkgName]
-	if !ok {
-		return nil
-	}
-	astTypeSpec, _ := packageModels[model]
-	return astTypeSpec
-}
-
-func (p *parser) parseFieldList(m *Model, fieldList []*ast.Field, modelPackage string) {
-	if fieldList == nil {
-		return
-	}
-	m.Properties = map[string]*ModelProperty{}
-	for _, field := range fieldList {
-		p.parseModelProperty(m, field, modelPackage)
-	}
-}
-
-func (p *parser) parseModelProperty(m *Model, field *ast.Field, modelPackage string) {
-	var name string
-	var innerModel *Model
-
-	property := &ModelProperty{}
-
-	typeAsString := getTypeAsString(field.Type)
-	// log.Printf("Get type as string %s \n", typeAsString)
-
-	reInternalIndirect := regexp.MustCompile("&\\{(\\w*) <nil> (\\w*)\\}")
-	typeAsString = string(reInternalIndirect.ReplaceAll([]byte(typeAsString), []byte("[]$2")))
-
-	// Sometimes reflection reports an object as "&{foo Bar}" rather than just "foo.Bar"
-	// The next 2 lines of code normalize them to foo.Bar
-	reInternalRepresentation := regexp.MustCompile("&\\{(\\w*) (\\w*)\\}")
-	typeAsString = string(reInternalRepresentation.ReplaceAll([]byte(typeAsString), []byte("$1.$2")))
-
-	// fmt.Println(m.Id, field.Names, typeAsString)
-
-	if strings.HasPrefix(typeAsString, "[]") {
-		property.Type = "array"
-		p.setItemType(property, typeAsString[2:])
-		// if is Unsupported item type of list, ignore this property
-		if property.Items.Type == "undefined" {
-			property = nil
-			return
-		}
-	} else if strings.HasPrefix(typeAsString, "map[]") {
-		property.Type = "map"
-	} else if typeAsString == "time.Time" {
-		property.Type = "Time"
-	} else {
-		property.Type = typeAsString
-	}
-
-	// fmt.Println(m.Id, field.Names, property.Type)
-
-	if len(field.Names) == 0 {
-		if astSelectorExpr, ok := field.Type.(*ast.SelectorExpr); ok {
-			packageName := modelPackage
-			if astTypeIdent, ok := astSelectorExpr.X.(*ast.Ident); ok {
-				packageName = astTypeIdent.Name
-			}
-			name = packageName + "." + strings.TrimPrefix(astSelectorExpr.Sel.Name, "*")
-		} else if astTypeIdent, ok := field.Type.(*ast.Ident); ok {
-			name = astTypeIdent.Name
-		} else if astStarExpr, ok := field.Type.(*ast.StarExpr); ok {
-			if astIdent, ok := astStarExpr.X.(*ast.Ident); ok {
-				name = astIdent.Name
-			} else if astSelectorExpr, ok := astStarExpr.X.(*ast.SelectorExpr); ok {
-				packageName := modelPackage
-				if astTypeIdent, ok := astSelectorExpr.X.(*ast.Ident); ok {
-					packageName = astTypeIdent.Name
+			guessPkgName = p.PkgNameImportedPkgAlias[pkgName][guessPkgName][0]
+			guessPkgPath = ""
+			for i := range p.KnownPkgs {
+				if guessPkgName == p.KnownPkgs[i].Name {
+					guessPkgPath = p.KnownPkgs[i].Path
+					break
 				}
-
-				name = packageName + "." + strings.TrimPrefix(astSelectorExpr.Sel.Name, "*")
 			}
-		} else {
-			log.Fatalf("Something goes wrong: %#v", field.Type)
-		}
-		innerModel = &Model{}
-		//log.Printf("Try to parse embeded type %s \n", name)
-		//log.Fatalf("DEBUG: field: %#v\n, selector.X: %#v\n selector.Sel: %#v\n", field, astSelectorExpr.X, astSelectorExpr.Sel)
-		knownModelNames := map[string]bool{}
-		p.parseModel(innerModel, name, modelPackage, knownModelNames)
-
-		for innerFieldName, innerField := range innerModel.Properties {
-			_, exist := m.Properties[innerFieldName]
-			if exist {
-				continue
+			// p.debugf("guess %s ast.TypeSpec in package %s", guessTypeName, guessPkgName)
+			typeSpec, exist = p.getTypeSpec(guessPkgPath, guessPkgName, guessTypeName)
+			if !exist {
+				p.debugf("can not find definition of guess %s ast.TypeSpec in package %s", guessTypeName, guessPkgName)
+				return &schemaObject, nil
 			}
-			// fmt.Println("@@", m.Id, innerFieldName)
-			m.Properties[innerFieldName] = innerField
+			schemaObject.PkgName = guessPkgName
+			schemaObject.ID = genSchemeaObjectID(guessPkgName, guessTypeName)
+			p.KnownIDSchema[schemaObject.ID] = &schemaObject
 		}
-
-		//log.Fatalf("Here %#v\n", field.Type)
-		return
+		pkgPath, pkgName = guessPkgPath, guessPkgName
 	}
-	name = field.Names[0].Name
 
-	//log.Printf("ParseModelProperty: %s, CurrentPackage %s, type: %s \n", name, modelPackage, property.Type)
-	//Analyse struct fields annotations
-	if field.Tag != nil {
-		structTag := reflect.StructTag(strings.Trim(field.Tag.Value, "`"))
-		var tagText string
-		if thriftTag := structTag.Get("thrift"); thriftTag != "" {
-			tagText = thriftTag
+	if astIdent, ok := typeSpec.Type.(*ast.Ident); ok {
+		_ = astIdent
+	} else if astStructType, ok := typeSpec.Type.(*ast.StructType); ok {
+		schemaObject.Type = "object"
+		if astStructType.Fields != nil {
+			p.parseSchemaPropertiesFromStructFields(pkgPath, pkgName, &schemaObject, astStructType.Fields.List)
 		}
-		if tag := structTag.Get("json"); tag != "" {
-			tagText = tag
-		}
-		if tag := structTag.Get("example"); tag != "" {
-			if strings.Contains(property.Type, "int") {
-				property.Example, _ = strconv.Atoi(tag)
-			} else if strings.Contains(property.Type, "float") {
-				property.Example, _ = strconv.ParseFloat(tag, 64)
-			} else if b, err := strconv.ParseBool(tag); err == nil {
-				property.Example = b
-			} else if property.Type == "array" {
-				b, err := json.RawMessage(tag).MarshalJSON()
-				if err != nil {
-					property.Example = "invalid example"
-				} else {
-					sliceOfInterface := []interface{}{}
-					err := json.Unmarshal(b, &sliceOfInterface)
-					if err != nil {
-						property.Example = "invalid example"
-					} else {
-						property.Example = sliceOfInterface
-					}
-				}
-			} else if property.Type == "map" {
-				b, err := json.RawMessage(tag).MarshalJSON()
-				if err != nil {
-					property.Example = "invalid example"
-				} else {
-					mapOfInterface := map[string]interface{}{}
-					err := json.Unmarshal(b, &mapOfInterface)
-					if err != nil {
-						property.Example = "invalid example"
-					} else {
-						property.Example = mapOfInterface
-					}
-				}
+	} else if astArrayType, ok := typeSpec.Type.(*ast.ArrayType); ok {
+		schemaObject.Type = "array"
+		schemaObject.Items = &SchemaObject{}
+		typeAsString := p.getTypeAsString(astArrayType.Elt)
+		typeAsString = strings.TrimLeft(typeAsString, "*")
+		if !isBasicGoType(typeAsString) {
+			schemaItemsSchemeaObjectID, err := p.registerType(pkgPath, pkgName, typeAsString)
+			if err != nil {
+				p.debug("parseSchemaObject parse array items err:", err)
 			} else {
-				property.Example = tag
+				schemaObject.Items.Ref = addSchemaRefLinkPrefix(schemaItemsSchemeaObjectID)
 			}
+		} else if isGoTypeOASType(typeAsString) {
+			schemaObject.Items.Type = goTypesOASTypes[typeAsString]
 		}
-
-		tagValues := strings.Split(tagText, ",")
-		var isRequired = false
-
-		for _, v := range tagValues {
-			if v != "" && v != "required" && v != "omitempty" {
-				name = v
+	} else if astMapType, ok := typeSpec.Type.(*ast.MapType); ok {
+		schemaObject.Type = "object"
+		schemaObject.Properties = map[string]*SchemaObject{"key": &SchemaObject{}}
+		typeAsString := p.getTypeAsString(astMapType.Value)
+		typeAsString = strings.TrimLeft(typeAsString, "*")
+		if !isBasicGoType(typeAsString) {
+			schemaItemsSchemeaObjectID, err := p.registerType(pkgPath, pkgName, typeAsString)
+			if err != nil {
+				p.debug("parseSchemaObject parse array items err:", err)
+			} else {
+				schemaObject.Properties["key"].Ref = addSchemaRefLinkPrefix(schemaItemsSchemeaObjectID)
 			}
-			if v == "required" {
-				isRequired = true
-			}
-			// We will not document at all any fields with a json tag of "-"
-			if v == "-" {
+		} else if isGoTypeOASType(typeAsString) {
+			schemaObject.Properties["key"].Type = goTypesOASTypes[typeAsString]
+		}
+	}
+
+	return &schemaObject, nil
+}
+
+func (p *parser) getTypeSpec(pkgPath, pkgName, typeName string) (*ast.TypeSpec, bool) {
+	pkgTypeSpecs, exist := p.TypeSpecs[pkgName]
+	if !exist {
+		return nil, false
+	}
+	astTypeSpec, exist := pkgTypeSpecs[typeName]
+	if !exist {
+		return nil, false
+	}
+	return astTypeSpec, true
+}
+
+func (p *parser) parseSchemaPropertiesFromStructFields(pkgPath, pkgName string, structSchema *SchemaObject, astFields []*ast.Field) {
+	if astFields == nil {
+		return
+	}
+	var err error
+	structSchema.Properties = map[string]*SchemaObject{}
+	for _, astField := range astFields {
+		fieldSchema := &SchemaObject{}
+		typeAsString := p.getTypeAsString(astField.Type)
+		typeAsString = strings.TrimLeft(typeAsString, "*")
+		if strings.HasPrefix(typeAsString, "[]") {
+			fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
+			if err != nil {
+				p.debug(err)
 				return
 			}
+		} else if strings.HasPrefix(typeAsString, "map[]") {
+			fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
+			if err != nil {
+				p.debug(err)
+				return
+			}
+		} else if typeAsString == "time.Time" {
+			fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
+			if err != nil {
+				p.debug(err)
+				return
+			}
+		} else if strings.HasPrefix(typeAsString, "interface{}") {
+			fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
+			if err != nil {
+				p.debug(err)
+				return
+			}
+		} else if !isBasicGoType(typeAsString) {
+			fieldSchemaSchemeaObjectID, err := p.registerType(pkgPath, pkgName, typeAsString)
+			if err != nil {
+				p.debug("parseSchemaPropertiesFromStructFields err:", err)
+			} else {
+				fieldSchema.ID = fieldSchemaSchemeaObjectID
+				fieldSchema.Ref = addSchemaRefLinkPrefix(fieldSchemaSchemeaObjectID)
+			}
+		} else if isGoTypeOASType(typeAsString) {
+			fieldSchema.Type = goTypesOASTypes[typeAsString]
 		}
-		if required := structTag.Get("required"); required != "" || isRequired {
-			m.Required = append(m.Required, name)
+
+		// embedded type
+		if len(astField.Names) == 0 {
+			if fieldSchema.Properties != nil {
+				for propertyName := range fieldSchema.Properties {
+					_, exist := structSchema.Properties[propertyName]
+					if exist {
+						continue
+					}
+					structSchema.Properties[propertyName] = fieldSchema.Properties[propertyName]
+				}
+			} else if len(fieldSchema.Ref) != 0 && len(fieldSchema.ID) != 0 {
+				refSchema, ok := p.KnownIDSchema[fieldSchema.ID]
+				if ok {
+					for propertyName := range refSchema.Properties {
+						_, exist := structSchema.Properties[propertyName]
+						if exist {
+							continue
+						}
+						structSchema.Properties[propertyName] = refSchema.Properties[propertyName]
+					}
+				}
+			}
+			continue
 		}
-		if desc := structTag.Get("description"); desc != "" {
-			property.Description = desc
+
+		name := astField.Names[0].Name
+
+		if astField.Tag != nil {
+			astFieldTag := reflect.StructTag(strings.Trim(astField.Tag.Value, "`"))
+			tagText := ""
+			if tag := astFieldTag.Get("json"); tag != "" {
+				tagText = tag
+			}
+			tagValues := strings.Split(tagText, ",")
+			isRequired := false
+			for _, v := range tagValues {
+				if v != "" && v != "required" && v != "omitempty" {
+					name = v
+				}
+				if v == "required" {
+					isRequired = true
+				}
+				// We will not document at all any astFields with a json tag of "-"
+				if v == "-" {
+					continue
+				}
+			}
+
+			if tag := astFieldTag.Get("example"); tag != "" {
+				switch fieldSchema.Type {
+				case "boolean":
+					fieldSchema.Example, _ = strconv.ParseBool(tag)
+				case "integer":
+					fieldSchema.Example, _ = strconv.Atoi(tag)
+				case "number":
+					fieldSchema.Example, _ = strconv.ParseFloat(tag, 64)
+				case "array":
+					b, err := json.RawMessage(tag).MarshalJSON()
+					if err != nil {
+						fieldSchema.Example = "invalid example"
+					} else {
+						sliceOfInterface := []interface{}{}
+						err := json.Unmarshal(b, &sliceOfInterface)
+						if err != nil {
+							fieldSchema.Example = "invalid example"
+						} else {
+							fieldSchema.Example = sliceOfInterface
+						}
+					}
+				case "object":
+					b, err := json.RawMessage(tag).MarshalJSON()
+					if err != nil {
+						fieldSchema.Example = "invalid example"
+					} else {
+						mapOfInterface := map[string]interface{}{}
+						err := json.Unmarshal(b, &mapOfInterface)
+						if err != nil {
+							fieldSchema.Example = "invalid example"
+						} else {
+							fieldSchema.Example = mapOfInterface
+						}
+					}
+				default:
+					fieldSchema.Example = tag
+				}
+			}
+
+			if _, ok := astFieldTag.Lookup("required"); ok || isRequired {
+				structSchema.Required = append(structSchema.Required, name)
+			}
+			if desc := astFieldTag.Get("description"); desc != "" {
+				fieldSchema.Description = desc
+			}
 		}
+
+		structSchema.Properties[name] = fieldSchema
 	}
-	m.Properties[name] = property
 }
 
-func (p *parser) setItemType(mp *ModelProperty, itemType string) {
-	mp.Items = &ModelPropertyItems{}
-	if isBasicType(itemType) {
-		if isBasicTypeOASType(itemType) {
-			mp.Items.Type = itemType
-		} else {
-			mp.Items.Type = "undefined"
-		}
-	} else {
-		mp.Items.Ref = itemType
-	}
-}
-
-func (p *parser) getPkgPathByPkgName(pkgName string) string {
-	cachedPkgPath, ok := p.PkgPathCache[pkgName]
+func (p *parser) getTypeAsString(fieldType interface{}) string {
+	astArrayType, ok := fieldType.(*ast.ArrayType)
 	if ok {
-		return cachedPkgPath
+		return fmt.Sprintf("[]%v", p.getTypeAsString(astArrayType.Elt))
 	}
-	return ""
+
+	astMapType, ok := fieldType.(*ast.MapType)
+	if ok {
+		return fmt.Sprintf("map[]%v", p.getTypeAsString(astMapType.Value))
+	}
+
+	_, ok = fieldType.(*ast.InterfaceType)
+	if ok {
+		return "interface{}"
+	}
+
+	astStarExpr, ok := fieldType.(*ast.StarExpr)
+	if ok {
+		// return fmt.Sprintf("*%v", p.getTypeAsString(astStarExpr.X))
+		return fmt.Sprintf("%v", p.getTypeAsString(astStarExpr.X))
+	}
+
+	astSelectorExpr, ok := fieldType.(*ast.SelectorExpr)
+	if ok {
+		packageNameIdent, _ := astSelectorExpr.X.(*ast.Ident)
+		return packageNameIdent.Name + "." + astSelectorExpr.Sel.Name
+	}
+
+	return fmt.Sprint(fieldType)
 }
 
 func (p *parser) debug(v ...interface{}) {

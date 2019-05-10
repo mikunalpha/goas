@@ -2,8 +2,6 @@ package main
 
 import (
 	"bufio"
-	"fmt"
-	"go/ast"
 	"log"
 	"os"
 	"strings"
@@ -71,7 +69,7 @@ func isInStringList(list []string, s string) bool {
 	return false
 }
 
-var basicTypes = map[string]bool{
+var basicGoTypes = map[string]bool{
 	"bool":       true,
 	"uint":       true,
 	"uint8":      true,
@@ -85,8 +83,6 @@ var basicTypes = map[string]bool{
 	"int64":      true,
 	"float32":    true,
 	"float64":    true,
-	"number":     true, // OAS float32
-	"double":     true, // OAS float64
 	"string":     true,
 	"complex64":  true,
 	"complex128": true,
@@ -94,16 +90,14 @@ var basicTypes = map[string]bool{
 	"rune":       true,
 	"uintptr":    true,
 	"error":      true,
-	"Time":       true,
-	// "undefined": true,
 }
 
-func isBasicType(typeName string) bool {
-	_, ok := basicTypes[typeName]
-	return ok || strings.Contains(typeName, "map") || strings.Contains(typeName, "interface")
+func isBasicGoType(typeName string) bool {
+	_, ok := basicGoTypes[typeName]
+	return ok
 }
 
-var basicTypesOASTypes = map[string]string{
+var goTypesOASTypes = map[string]string{
 	"bool":    "boolean",
 	"uint":    "integer",
 	"uint8":   "integer",
@@ -118,15 +112,14 @@ var basicTypesOASTypes = map[string]string{
 	"float32": "number",
 	"float64": "number",
 	"string":  "string",
-	"Time":    "string",
 }
 
-func isBasicTypeOASType(typeName string) bool {
-	_, ok := basicTypesOASTypes[typeName]
-	return ok || strings.Contains(typeName, "map") || strings.Contains(typeName, "interface")
+func isGoTypeOASType(typeName string) bool {
+	_, ok := goTypesOASTypes[typeName]
+	return ok
 }
 
-var basicTypesOASFormats = map[string]string{
+var goTypesOASFormats = map[string]string{
 	"bool":    "boolean",
 	"uint":    "int64",
 	"uint8":   "int64",
@@ -141,56 +134,24 @@ var basicTypesOASFormats = map[string]string{
 	"float32": "float",
 	"float64": "double",
 	"string":  "string",
-	"Time":    "string",
 }
 
-var typeDefTranslations = map[string]string{}
+// var typeDefTranslations = map[string]string{}
 
-var modelNamesPackageNames = map[string]string{}
+// var modelNamesPackageNames = map[string]string{}
 
-func referenceLink(name string) string {
-	if strings.HasPrefix(name, "#/schemas/") {
+func addSchemaRefLinkPrefix(name string) string {
+	if strings.HasPrefix(name, "#/components/schemas/") {
 		return name
 	}
-
 	return "#/components/schemas/" + name
 }
 
-func trimeReferenceLinkPrefix(ref string) string {
+func trimeSchemaRefLinkPrefix(ref string) string {
 	return strings.TrimPrefix(ref, "#/components/schemas/")
 }
 
-func getTypeAsString(fieldType interface{}) string {
-	astArrayType, ok := fieldType.(*ast.ArrayType)
-	if ok {
-		// log.Printf("arrayType: %#v\n", astArrayType)
-		return fmt.Sprintf("[]%v", getTypeAsString(astArrayType.Elt))
-	}
-
-	astMapType, ok := fieldType.(*ast.MapType)
-	if ok {
-		// log.Printf("astMapType: %#v\n", astMapType)
-		return fmt.Sprintf("map[]%v", getTypeAsString(astMapType.Value))
-	}
-
-	_, ok = fieldType.(*ast.InterfaceType)
-	if ok {
-		return "interface"
-	}
-
-	astStarExpr, ok := fieldType.(*ast.StarExpr)
-	if ok {
-		// log.Printf("Get type as string (star expression)! %#v, type: %s\n", astStarExpr.X, fmt.Sprint(astStarExpr.X))
-		return fmt.Sprint(astStarExpr.X)
-	}
-
-	astSelectorExpr, ok := fieldType.(*ast.SelectorExpr)
-	if ok {
-		// log.Printf("Get type as string(selector expression)! X: %#v , Sel: %#v, type %s\n", astSelectorExpr.X, astSelectorExpr.Sel, realType)
-		packageNameIdent, _ := astSelectorExpr.X.(*ast.Ident)
-		return packageNameIdent.Name + "." + astSelectorExpr.Sel.Name
-	}
-
-	// log.Printf("Get type as string(no star expression)! %#v , type: %s\n", fieldType, fmt.Sprint(fieldType))
-	return fmt.Sprint(fieldType)
+func genSchemeaObjectID(pkgName, typeName string) string {
+	typeNameParts := strings.Split(typeName, ".")
+	return strings.Join(append(strings.Split(pkgName, "/"), typeNameParts[len(typeNameParts)-1]), ".")
 }
