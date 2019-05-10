@@ -290,7 +290,7 @@ func (p *parser) parseInfo() error {
 
 func (p *parser) parseModule() error {
 	walker := func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() {
+		if info != nil && info.IsDir() {
 			if strings.HasPrefix(strings.Trim(strings.TrimPrefix(path, p.ModulePath), "/"), ".git") {
 				return nil
 			}
@@ -342,7 +342,7 @@ func (p *parser) parseGoMod() error {
 		p.KnownPathPkg[pkgPath] = &p.KnownPkgs[len(p.KnownPkgs)-1]
 
 		walker := func(path string, info os.FileInfo, err error) error {
-			if info.IsDir() {
+			if info != nil && info.IsDir() {
 				if strings.HasPrefix(strings.Trim(strings.TrimPrefix(path, p.ModulePath), "/"), ".git") {
 					return nil
 				}
