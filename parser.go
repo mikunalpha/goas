@@ -967,7 +967,14 @@ func (p *parser) parseSchemaPropertiesFromStructFields(pkgPath, pkgName string, 
 	}
 	var err error
 	structSchema.Properties = map[string]*SchemaObject{}
+	if structSchema.DisabledFieldNames == nil {
+		structSchema.DisabledFieldNames = map[string]struct{}{}
+	}
+astFieldsLoop:
 	for _, astField := range astFields {
+		if len(astField.Names) == 0 {
+			continue
+		}
 		fieldSchema := &SchemaObject{}
 		typeAsString := p.getTypeAsString(astField.Type)
 		typeAsString = strings.TrimLeft(typeAsString, "*")
@@ -1011,32 +1018,42 @@ func (p *parser) parseSchemaPropertiesFromStructFields(pkgPath, pkgName string, 
 			fieldSchema.Type = goTypesOASTypes[typeAsString]
 		}
 
-		// embedded type
-		if len(astField.Names) == 0 {
-			if fieldSchema.Properties != nil {
-				for propertyName := range fieldSchema.Properties {
-					_, exist := structSchema.Properties[propertyName]
-					if exist {
-						continue
-					}
-					structSchema.Properties[propertyName] = fieldSchema.Properties[propertyName]
-				}
-			} else if len(fieldSchema.Ref) != 0 && len(fieldSchema.ID) != 0 {
-				refSchema, ok := p.KnownIDSchema[fieldSchema.ID]
-				if ok {
-					for propertyName := range refSchema.Properties {
-						_, exist := structSchema.Properties[propertyName]
-						if exist {
-							continue
-						}
-						structSchema.Properties[propertyName] = refSchema.Properties[propertyName]
-					}
-				}
-			}
-			continue
-		}
+		// // embedded type
+		// if len(astField.Names) == 0 {
+		// 	if fieldSchema.Properties != nil {
+		// 		for propertyName := range fieldSchema.Properties {
+		// 			_, exist := structSchema.Properties[propertyName]
+		// 			if exist {
+		// 				continue
+		// 			}
+		// 			structSchema.Properties[propertyName] = fieldSchema.Properties[propertyName]
+		// 		}
+		// 	} else if len(fieldSchema.Ref) != 0 && len(fieldSchema.ID) != 0 {
+		// 		refSchema, ok := p.KnownIDSchema[fieldSchema.ID]
+		// 		if ok {
+		// 			for propertyName := range refSchema.Properties {
+		// 				_, disabled := structSchema.DisabledFieldNames[refSchema.Properties[propertyName].FieldName]
+		// 				if disabled {
+		// 					continue
+		// 				}
+		// 				// p.debug(">", propertyName)
+		// 				_, exist := structSchema.Properties[propertyName]
+		// 				if exist {
+		// 					continue
+		// 				}
+		// 				structSchema.Properties[propertyName] = refSchema.Properties[propertyName]
+		// 			}
+		// 		}
+		// 	}
+		// 	continue
+		// }
 
 		name := astField.Names[0].Name
+		fieldSchema.FieldName = name
+		_, disabled := structSchema.DisabledFieldNames[name]
+		if disabled {
+			continue
+		}
 
 		if astField.Tag != nil {
 			astFieldTag := reflect.StructTag(strings.Trim(astField.Tag.Value, "`"))
@@ -1047,15 +1064,14 @@ func (p *parser) parseSchemaPropertiesFromStructFields(pkgPath, pkgName string, 
 			tagValues := strings.Split(tagText, ",")
 			isRequired := false
 			for _, v := range tagValues {
-				if v != "" && v != "required" && v != "omitempty" {
-					name = v
-				}
-				if v == "required" {
-					isRequired = true
-				}
-				// We will not document at all any astFields with a json tag of "-"
 				if v == "-" {
-					continue
+					structSchema.DisabledFieldNames[name] = struct{}{}
+					fieldSchema.Deprecated = true
+					continue astFieldsLoop
+				} else if v == "required" {
+					isRequired = true
+				} else if v != "" && v != "required" && v != "omitempty" {
+					name = v
 				}
 			}
 
@@ -1111,6 +1127,82 @@ func (p *parser) parseSchemaPropertiesFromStructFields(pkgPath, pkgName string, 
 		}
 
 		structSchema.Properties[name] = fieldSchema
+	}
+	for _, astField := range astFields {
+		if len(astField.Names) > 0 {
+			continue
+		}
+		fieldSchema := &SchemaObject{}
+		typeAsString := p.getTypeAsString(astField.Type)
+		typeAsString = strings.TrimLeft(typeAsString, "*")
+		if strings.HasPrefix(typeAsString, "[]") {
+			fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
+			if err != nil {
+				p.debug(err)
+				return
+			}
+		} else if strings.HasPrefix(typeAsString, "map[]") {
+			fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
+			if err != nil {
+				p.debug(err)
+				return
+			}
+		} else if typeAsString == "time.Time" {
+			fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
+			if err != nil {
+				p.debug(err)
+				return
+			}
+		} else if strings.HasPrefix(typeAsString, "interface{}") {
+			fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
+			if err != nil {
+				p.debug(err)
+				return
+			}
+		} else if !isBasicGoType(typeAsString) {
+			fieldSchemaSchemeaObjectID, err := p.registerType(pkgPath, pkgName, typeAsString)
+			if err != nil {
+				p.debug("parseSchemaPropertiesFromStructFields err:", err)
+			} else {
+				fieldSchema.ID = fieldSchemaSchemeaObjectID
+				schema, ok := p.KnownIDSchema[fieldSchemaSchemeaObjectID]
+				if ok {
+					fieldSchema.Type = schema.Type
+				}
+				fieldSchema.Ref = addSchemaRefLinkPrefix(fieldSchemaSchemeaObjectID)
+			}
+		} else if isGoTypeOASType(typeAsString) {
+			fieldSchema.Type = goTypesOASTypes[typeAsString]
+		}
+		// embedded type
+		if len(astField.Names) == 0 {
+			if fieldSchema.Properties != nil {
+				for propertyName := range fieldSchema.Properties {
+					_, exist := structSchema.Properties[propertyName]
+					if exist {
+						continue
+					}
+					structSchema.Properties[propertyName] = fieldSchema.Properties[propertyName]
+				}
+			} else if len(fieldSchema.Ref) != 0 && len(fieldSchema.ID) != 0 {
+				refSchema, ok := p.KnownIDSchema[fieldSchema.ID]
+				if ok {
+					for propertyName := range refSchema.Properties {
+						_, disabled := structSchema.DisabledFieldNames[refSchema.Properties[propertyName].FieldName]
+						if disabled {
+							continue
+						}
+						// p.debug(">", propertyName)
+						_, exist := structSchema.Properties[propertyName]
+						if exist {
+							continue
+						}
+						structSchema.Properties[propertyName] = refSchema.Properties[propertyName]
+					}
+				}
+			}
+			continue
+		}
 	}
 }
 

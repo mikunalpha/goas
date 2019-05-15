@@ -129,8 +129,10 @@ type MediaTypeObject struct {
 }
 
 type SchemaObject struct {
-	ID      string `json:"-"` // For goas
-	PkgName string `json:"-"` // For goas
+	ID                 string              `json:"-"` // For goas
+	PkgName            string              `json:"-"` // For goas
+	FieldName          string              `json:"-"` // For goas
+	DisabledFieldNames map[string]struct{} `json:"-"` // For goas
 
 	Type        string                   `json:"type,omitempty"`
 	Format      string                   `json:"format,omitempty"`
@@ -139,6 +141,7 @@ type SchemaObject struct {
 	Description string                   `json:"description,omitempty"`
 	Items       *SchemaObject            `json:"items,omitempty"` // use ptr to prevent recursive error
 	Example     interface{}              `json:"example,omitempty"`
+	Deprecated  bool                     `json:"deprecated,omitempty"`
 
 	// Ref is used when SchemaObject is as a ReferenceObject
 	Ref string `json:"$ref,omitempty"`
@@ -170,7 +173,6 @@ type SchemaObject struct {
 	// WriteOnly
 	// XML
 	// ExternalDocs
-	// Deprecated
 }
 
 type ResponsesObject map[string]*ResponseObject // [status]ResponseObject
