@@ -42,9 +42,6 @@ type parser struct {
 	PkgPathAstPkgCache      map[string]map[string]*ast.Package
 	PkgNameImportedPkgAlias map[string]map[string][]string
 
-	// PkgPathCache    map[string]string
-	// PkgImports      map[string]map[string][]string
-
 	Debug bool
 }
 
@@ -1004,6 +1001,10 @@ func (p *parser) parseSchemaPropertiesFromStructFields(pkgPath, pkgName string, 
 				p.debug("parseSchemaPropertiesFromStructFields err:", err)
 			} else {
 				fieldSchema.ID = fieldSchemaSchemeaObjectID
+				schema, ok := p.KnownIDSchema[fieldSchemaSchemeaObjectID]
+				if ok {
+					fieldSchema.Type = schema.Type
+				}
 				fieldSchema.Ref = addSchemaRefLinkPrefix(fieldSchemaSchemeaObjectID)
 			}
 		} else if isGoTypeOASType(typeAsString) {
@@ -1094,6 +1095,10 @@ func (p *parser) parseSchemaPropertiesFromStructFields(pkgPath, pkgName string, 
 					}
 				default:
 					fieldSchema.Example = tag
+				}
+
+				if fieldSchema.Example != nil && len(fieldSchema.Ref) != 0 {
+					fieldSchema.Ref = ""
 				}
 			}
 
