@@ -21,6 +21,11 @@ var flags = []cli.Flag{
 		Usage: "goas will start to search @comment from this main file",
 	},
 	cli.StringFlag{
+		Name:  "handler-path",
+		Value: "",
+		Usage: "goas only search handleFunc comments under the path",
+	},
+	cli.StringFlag{
 		Name:  "output",
 		Value: "oas.json",
 		Usage: "output file",
@@ -32,7 +37,7 @@ var flags = []cli.Flag{
 }
 
 func action(c *cli.Context) error {
-	p, err := newParser(c.GlobalString("module-path"), c.GlobalString("main-file-path"), c.GlobalBool("debug"))
+	p, err := newParser(c.GlobalString("module-path"), c.GlobalString("main-file-path"), c.GlobalString("handler-path"), c.GlobalBool("debug"))
 	if err != nil {
 		return err
 	}

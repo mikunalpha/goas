@@ -27,6 +27,8 @@ type parser struct {
 
 	MainFilePath string
 
+	HandlerPath string
+
 	GoModFilePath string
 
 	GoModCachePath string
@@ -50,7 +52,7 @@ type pkg struct {
 	Path string
 }
 
-func newParser(modulePath, mainFilePath string, debug bool) (*parser, error) {
+func newParser(modulePath, mainFilePath, handlerPath string, debug bool) (*parser, error) {
 	p := &parser{
 		KnownPkgs:               []pkg{},
 		KnownNamePkg:            map[string]*pkg{},
@@ -162,6 +164,19 @@ func newParser(modulePath, mainFilePath string, debug bool) (*parser, error) {
 	}
 	p.GoModCachePath = goModCachePath
 	p.debugf("go module cache path: %s", p.GoModCachePath)
+
+	if handlerPath != "" {
+		handlerPath, _ = filepath.Abs(handlerPath)
+		_, err := os.Stat(handlerPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil, err
+			}
+			return nil, fmt.Errorf("cannot get information of %s: %s", handlerPath, err)
+		}
+	}
+	p.HandlerPath = handlerPath
+	p.debugf("handler path: %s", p.HandlerPath)
 
 	return p, nil
 }
@@ -546,6 +561,8 @@ func (p *parser) parseOperation(pkgPath, pkgName string, astComments []*ast.Comm
 	if !strings.HasPrefix(pkgPath, p.ModulePath) {
 		// ignore this pkgName
 		// p.debugf("parseOperation ignores %s", pkgPath)
+		return nil
+	} else if p.HandlerPath != "" && !strings.HasPrefix(pkgPath, p.HandlerPath) {
 		return nil
 	}
 	var err error
