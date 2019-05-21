@@ -18,6 +18,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/iancoleman/orderedmap"
 	"github.com/mikunalpha/go-module"
 )
 
@@ -629,7 +630,7 @@ func (p *parser) parseParamComment(pkgPath, pkgName string, operation *Operation
 					ContentTypeForm: &MediaTypeObject{
 						Schema: SchemaObject{
 							Type:       "object",
-							Properties: map[string]*SchemaObject{},
+							Properties: orderedmap.New(),
 						},
 					},
 				},
@@ -637,17 +638,17 @@ func (p *parser) parseParamComment(pkgPath, pkgName string, operation *Operation
 			}
 		}
 		if in == "file" {
-			operation.RequestBody.Content[ContentTypeForm].Schema.Properties[name] = &SchemaObject{
+			operation.RequestBody.Content[ContentTypeForm].Schema.Properties.Set(name, &SchemaObject{
 				Type:        "string",
 				Format:      "binary",
 				Description: description,
-			}
+			})
 		} else if isGoTypeOASType(goType) {
-			operation.RequestBody.Content[ContentTypeForm].Schema.Properties[name] = &SchemaObject{
+			operation.RequestBody.Content[ContentTypeForm].Schema.Properties.Set(name, &SchemaObject{
 				Type:        goTypesOASTypes[goType],
 				Format:      goTypesOASFormats[goType],
 				Description: description,
-			}
+			})
 		}
 		return nil
 	}
@@ -857,7 +858,8 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 		if err != nil {
 			return nil, err
 		}
-		schemaObject.Properties = map[string]*SchemaObject{"key": schemaProperty}
+		schemaObject.Properties = orderedmap.New()
+		schemaObject.Properties.Set("key", schemaProperty)
 		return &schemaObject, nil
 	} else if typeName == "time.Time" {
 		schemaObject.Type = "string"
@@ -948,7 +950,9 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 		}
 	} else if astMapType, ok := typeSpec.Type.(*ast.MapType); ok {
 		schemaObject.Type = "object"
-		schemaObject.Properties = map[string]*SchemaObject{"key": &SchemaObject{}}
+		schemaObject.Properties = orderedmap.New()
+		propertySchema := &SchemaObject{}
+		schemaObject.Properties.Set("key", propertySchema)
 		typeAsString := p.getTypeAsString(astMapType.Value)
 		typeAsString = strings.TrimLeft(typeAsString, "*")
 		if !isBasicGoType(typeAsString) {
@@ -956,10 +960,10 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 			if err != nil {
 				p.debug("parseSchemaObject parse array items err:", err)
 			} else {
-				schemaObject.Properties["key"].Ref = addSchemaRefLinkPrefix(schemaItemsSchemeaObjectID)
+				propertySchema.Ref = addSchemaRefLinkPrefix(schemaItemsSchemeaObjectID)
 			}
 		} else if isGoTypeOASType(typeAsString) {
-			schemaObject.Properties["key"].Type = goTypesOASTypes[typeAsString]
+			propertySchema.Type = goTypesOASTypes[typeAsString]
 		}
 	}
 
@@ -983,7 +987,7 @@ func (p *parser) parseSchemaPropertiesFromStructFields(pkgPath, pkgName string, 
 		return
 	}
 	var err error
-	structSchema.Properties = map[string]*SchemaObject{}
+	structSchema.Properties = orderedmap.New()
 	if structSchema.DisabledFieldNames == nil {
 		structSchema.DisabledFieldNames = map[string]struct{}{}
 	}
@@ -1034,36 +1038,6 @@ astFieldsLoop:
 		} else if isGoTypeOASType(typeAsString) {
 			fieldSchema.Type = goTypesOASTypes[typeAsString]
 		}
-
-		// // embedded type
-		// if len(astField.Names) == 0 {
-		// 	if fieldSchema.Properties != nil {
-		// 		for propertyName := range fieldSchema.Properties {
-		// 			_, exist := structSchema.Properties[propertyName]
-		// 			if exist {
-		// 				continue
-		// 			}
-		// 			structSchema.Properties[propertyName] = fieldSchema.Properties[propertyName]
-		// 		}
-		// 	} else if len(fieldSchema.Ref) != 0 && len(fieldSchema.ID) != 0 {
-		// 		refSchema, ok := p.KnownIDSchema[fieldSchema.ID]
-		// 		if ok {
-		// 			for propertyName := range refSchema.Properties {
-		// 				_, disabled := structSchema.DisabledFieldNames[refSchema.Properties[propertyName].FieldName]
-		// 				if disabled {
-		// 					continue
-		// 				}
-		// 				// p.debug(">", propertyName)
-		// 				_, exist := structSchema.Properties[propertyName]
-		// 				if exist {
-		// 					continue
-		// 				}
-		// 				structSchema.Properties[propertyName] = refSchema.Properties[propertyName]
-		// 			}
-		// 		}
-		// 	}
-		// 	continue
-		// }
 
 		name := astField.Names[0].Name
 		fieldSchema.FieldName = name
@@ -1143,7 +1117,7 @@ astFieldsLoop:
 			}
 		}
 
-		structSchema.Properties[name] = fieldSchema
+		structSchema.Properties.Set(name, fieldSchema)
 	}
 	for _, astField := range astFields {
 		if len(astField.Names) > 0 {
@@ -1194,27 +1168,30 @@ astFieldsLoop:
 		// embedded type
 		if len(astField.Names) == 0 {
 			if fieldSchema.Properties != nil {
-				for propertyName := range fieldSchema.Properties {
-					_, exist := structSchema.Properties[propertyName]
+				for _, propertyName := range fieldSchema.Properties.Keys() {
+					_, exist := structSchema.Properties.Get(propertyName)
 					if exist {
 						continue
 					}
-					structSchema.Properties[propertyName] = fieldSchema.Properties[propertyName]
+					propertySchema, _ := fieldSchema.Properties.Get(propertyName)
+					structSchema.Properties.Set(propertyName, propertySchema)
 				}
 			} else if len(fieldSchema.Ref) != 0 && len(fieldSchema.ID) != 0 {
 				refSchema, ok := p.KnownIDSchema[fieldSchema.ID]
 				if ok {
-					for propertyName := range refSchema.Properties {
-						_, disabled := structSchema.DisabledFieldNames[refSchema.Properties[propertyName].FieldName]
+					for _, propertyName := range refSchema.Properties.Keys() {
+						refPropertySchema, _ := refSchema.Properties.Get(propertyName)
+						_, disabled := structSchema.DisabledFieldNames[refPropertySchema.(*SchemaObject).FieldName]
 						if disabled {
 							continue
 						}
 						// p.debug(">", propertyName)
-						_, exist := structSchema.Properties[propertyName]
+						_, exist := structSchema.Properties.Get(propertyName)
 						if exist {
 							continue
 						}
-						structSchema.Properties[propertyName] = refSchema.Properties[propertyName]
+
+						structSchema.Properties.Set(propertyName, refPropertySchema)
 					}
 				}
 			}

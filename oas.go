@@ -1,5 +1,7 @@
 package main
 
+import "github.com/iancoleman/orderedmap"
+
 const (
 	OpenAPIVersion = "3.0.0"
 
@@ -134,14 +136,14 @@ type SchemaObject struct {
 	FieldName          string              `json:"-"` // For goas
 	DisabledFieldNames map[string]struct{} `json:"-"` // For goas
 
-	Type        string                   `json:"type,omitempty"`
-	Format      string                   `json:"format,omitempty"`
-	Required    []string                 `json:"required,omitempty"`
-	Properties  map[string]*SchemaObject `json:"properties,omitempty"`
-	Description string                   `json:"description,omitempty"`
-	Items       *SchemaObject            `json:"items,omitempty"` // use ptr to prevent recursive error
-	Example     interface{}              `json:"example,omitempty"`
-	Deprecated  bool                     `json:"deprecated,omitempty"`
+	Type        string                 `json:"type,omitempty"`
+	Format      string                 `json:"format,omitempty"`
+	Required    []string               `json:"required,omitempty"`
+	Properties  *orderedmap.OrderedMap `json:"properties,omitempty"`
+	Description string                 `json:"description,omitempty"`
+	Items       *SchemaObject          `json:"items,omitempty"` // use ptr to prevent recursive error
+	Example     interface{}            `json:"example,omitempty"`
+	Deprecated  bool                   `json:"deprecated,omitempty"`
 
 	// Ref is used when SchemaObject is as a ReferenceObject
 	Ref string `json:"$ref,omitempty"`
