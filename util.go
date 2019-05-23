@@ -142,9 +142,9 @@ var goTypesOASFormats = map[string]string{
 
 func addSchemaRefLinkPrefix(name string) string {
 	if strings.HasPrefix(name, "#/components/schemas/") {
-		return name
+		return replaceBackslash(name)
 	}
-	return "#/components/schemas/" + name
+	return replaceBackslash("#/components/schemas/" + name)
 }
 
 func trimeSchemaRefLinkPrefix(ref string) string {
@@ -154,4 +154,8 @@ func trimeSchemaRefLinkPrefix(ref string) string {
 func genSchemeaObjectID(pkgName, typeName string) string {
 	typeNameParts := strings.Split(typeName, ".")
 	return strings.Join(append(strings.Split(pkgName, "/"), typeNameParts[len(typeNameParts)-1]), ".")
+}
+
+func replaceBackslash(origin string) string {
+	return strings.ReplaceAll(origin, "\\", "/")
 }

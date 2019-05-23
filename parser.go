@@ -828,9 +828,9 @@ func (p *parser) registerType(pkgPath, pkgName, typeName string) (string, error)
 			return "", err
 		}
 		registerTypeName = schemaObject.ID
-		_, ok := p.OpenAPI.Components.Schemas[registerTypeName]
+		_, ok := p.OpenAPI.Components.Schemas[replaceBackslash(registerTypeName)]
 		if !ok {
-			p.OpenAPI.Components.Schemas[registerTypeName] = schemaObject
+			p.OpenAPI.Components.Schemas[replaceBackslash(registerTypeName)] = schemaObject
 		}
 	}
 	return registerTypeName, nil
