@@ -846,6 +846,11 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 	if strings.HasPrefix(typeName, "[]") {
 		schemaObject.Type = "array"
 		itemTypeName := typeName[2:]
+		schema, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, itemTypeName)]
+		if ok {
+			schemaObject.Items = &SchemaObject{Ref: addSchemaRefLinkPrefix(schema.ID)}
+			return &schemaObject, nil
+		}
 		schemaObject.Items, err = p.parseSchemaObject(pkgPath, pkgName, itemTypeName)
 		if err != nil {
 			return nil, err
@@ -854,6 +859,11 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 	} else if strings.HasPrefix(typeName, "map[]") {
 		schemaObject.Type = "object"
 		itemTypeName := typeName[5:]
+		schema, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, itemTypeName)]
+		if ok {
+			schemaObject.Items = &SchemaObject{Ref: addSchemaRefLinkPrefix(schema.ID)}
+			return &schemaObject, nil
+		}
 		schemaProperty, err := p.parseSchemaObject(pkgPath, pkgName, itemTypeName)
 		if err != nil {
 			return nil, err
