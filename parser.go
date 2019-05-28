@@ -1059,10 +1059,23 @@ astFieldsLoop:
 		if astField.Tag != nil {
 			astFieldTag := reflect.StructTag(strings.Trim(astField.Tag.Value, "`"))
 			tagText := ""
-			if tag := astFieldTag.Get("json"); tag != "" {
+
+			if tag := astFieldTag.Get("goas"); tag != "" {
 				tagText = tag
 			}
 			tagValues := strings.Split(tagText, ",")
+			for _, v := range tagValues {
+				if v == "-" {
+					structSchema.DisabledFieldNames[name] = struct{}{}
+					fieldSchema.Deprecated = true
+					continue astFieldsLoop
+				}
+			}
+
+			if tag := astFieldTag.Get("json"); tag != "" {
+				tagText = tag
+			}
+			tagValues = strings.Split(tagText, ",")
 			isRequired := false
 			for _, v := range tagValues {
 				if v == "-" {
@@ -1122,6 +1135,7 @@ astFieldsLoop:
 			if _, ok := astFieldTag.Lookup("required"); ok || isRequired {
 				structSchema.Required = append(structSchema.Required, name)
 			}
+
 			if desc := astFieldTag.Get("description"); desc != "" {
 				fieldSchema.Description = desc
 			}
