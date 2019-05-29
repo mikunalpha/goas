@@ -1042,6 +1042,9 @@ astFieldsLoop:
 				schema, ok := p.KnownIDSchema[fieldSchemaSchemeaObjectID]
 				if ok {
 					fieldSchema.Type = schema.Type
+					if schema.Items != nil {
+						fieldSchema.Items = schema.Items
+					}
 				}
 				fieldSchema.Ref = addSchemaRefLinkPrefix(fieldSchemaSchemeaObjectID)
 			}
@@ -1183,6 +1186,9 @@ astFieldsLoop:
 				schema, ok := p.KnownIDSchema[fieldSchemaSchemeaObjectID]
 				if ok {
 					fieldSchema.Type = schema.Type
+					if schema.Items != nil {
+						fieldSchema.Items = schema.Items
+					}
 				}
 				fieldSchema.Ref = addSchemaRefLinkPrefix(fieldSchemaSchemeaObjectID)
 			}
