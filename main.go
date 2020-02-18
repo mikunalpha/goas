@@ -51,7 +51,6 @@ func main() {
 	app.Usage = ""
 	// app.UsageText = "goas [options]"
 	app.Version = version
-	app.Copyright = "(c) 2018 mikun800527@gmail.com"
 	app.HideHelp = true
 	app.OnUsageError = func(c *cli.Context, err error, isSubcommand bool) error {
 		cli.ShowAppHelp(c)
