@@ -313,6 +313,7 @@ func (p *parser) parseModule() error {
 			}
 			// p.debug(path)
 			name := filepath.Join(p.ModuleName, strings.TrimPrefix(path, p.ModulePath))
+			name = filepath.ToSlash(name)
 			p.KnownPkgs = append(p.KnownPkgs, pkg{
 				Name: name,
 				Path: path,
@@ -347,6 +348,7 @@ func (p *parser) parseGoMod() error {
 		}
 		pkgName := goMod.Requires[i].Path
 		pkgPath := filepath.Join(p.GoModCachePath, string(pathRunes)+"@"+goMod.Requires[i].Version)
+		pkgName = filepath.ToSlash(pkgName)
 		p.KnownPkgs = append(p.KnownPkgs, pkg{
 			Name: pkgName,
 			Path: pkgPath,
@@ -365,6 +367,7 @@ func (p *parser) parseGoMod() error {
 				}
 				// p.debug(path)
 				name := filepath.Join(pkgName, strings.TrimPrefix(path, pkgPath))
+				name = filepath.ToSlash(name)
 				p.KnownPkgs = append(p.KnownPkgs, pkg{
 					Name: name,
 					Path: path,
