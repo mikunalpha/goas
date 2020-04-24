@@ -66,17 +66,9 @@ func newParser(modulePath, mainFilePath, handlerPath string, debug bool) (*parse
 	}
 	p.OpenAPI.OpenAPI = OpenAPIVersion
 	p.OpenAPI.Paths = make(PathsObject)
-	p.OpenAPI.Security = []map[string][]string{{
-		"AuthorizationHeader": []string{},
-	}}
+	p.OpenAPI.Security = []map[string][]string{}
 	p.OpenAPI.Components.Schemas = make(map[string]*SchemaObject)
-	p.OpenAPI.Components.SecuritySchemes = map[string]*SecuritySchemeObject{
-		"AuthorizationHeader": &SecuritySchemeObject{
-			Type:        "http",
-			Scheme:      "bearer",
-			Description: "Inuput your token",
-		},
-	}
+	p.OpenAPI.Components.SecuritySchemes = map[string]*SecuritySchemeObject{}
 
 	// check modulePath is exist
 	modulePath, _ = filepath.Abs(modulePath)
@@ -227,6 +219,11 @@ func (p *parser) parseInfo() error {
 	if err != nil {
 		return fmt.Errorf("can not parse general API information: %v", err)
 	}
+
+	// Security Scopes are defined at a different level in the hierarchy as where they need to end up in the OpenAPI structure,
+	// so a temporary list is needed.
+	oauthScopes := make(map[string]map[string]string, 0)
+
 	if fileTree.Comments != nil {
 		for i := range fileTree.Comments {
 			for _, comment := range strings.Split(fileTree.Comments[i].Text(), "\n") {
@@ -277,7 +274,84 @@ func (p *parser) parseInfo() error {
 					fields := strings.Split(value, " ")
 					s := ServerObject{URL: fields[0], Description: value[len(fields[0]):]}
 					p.OpenAPI.Servers = append(p.OpenAPI.Servers, s)
+				case "@security":
+					fields := strings.Split(value, " ")
+					security := map[string][]string{
+						fields[0]: fields[1:],
+					}
+					p.OpenAPI.Security = append(p.OpenAPI.Security, security)
+				case "@securityscheme":
+					fields := strings.Split(value, " ")
+
+					var scheme *SecuritySchemeObject
+					if strings.Contains(fields[1], "oauth2") {
+						if oauthScheme, ok := p.OpenAPI.Components.SecuritySchemes[fields[0]]; ok {
+							scheme = oauthScheme
+						} else {
+							scheme = &SecuritySchemeObject{
+								Type:       "oauth2",
+								OAuthFlows: &SecuritySchemeOauthObject{},
+							}
+						}
+					}
+
+					if scheme == nil {
+						scheme = &SecuritySchemeObject{
+							Type: fields[1],
+						}
+					}
+					switch fields[1] {
+					case "http":
+						scheme.Scheme = fields[2]
+						scheme.Description = strings.Join(fields[3:], " ")
+					case "apiKey":
+						scheme.In = fields[2]
+						scheme.Name = fields[3]
+						scheme.Description = strings.Join(fields[4:], "")
+					case "openIdConnect":
+						scheme.OpenIdConnectUrl = fields[2]
+						scheme.Description = strings.Join(fields[3:], " ")
+					case "oauth2AuthCode":
+						scheme.OAuthFlows.AuthorizationCode = &SecuritySchemeOauthFlowObject{
+							AuthorizationUrl: fields[2],
+							TokenUrl:         fields[3],
+							Scopes:           make(map[string]string, 0),
+						}
+					case "oauth2Implicit":
+						scheme.OAuthFlows.Implicit = &SecuritySchemeOauthFlowObject{
+							AuthorizationUrl: fields[2],
+							Scopes:           make(map[string]string, 0),
+						}
+					case "oauth2ResourceOwnerCredentials":
+						scheme.OAuthFlows.ResourceOwnerPassword = &SecuritySchemeOauthFlowObject{
+							TokenUrl: fields[2],
+							Scopes:   make(map[string]string, 0),
+						}
+					case "oauth2ClientCredentials":
+						scheme.OAuthFlows.ClientCredentials = &SecuritySchemeOauthFlowObject{
+							TokenUrl: fields[2],
+							Scopes:   make(map[string]string, 0),
+						}
+					}
+					p.OpenAPI.Components.SecuritySchemes[fields[0]] = scheme
+				case "@securityscope":
+					fields := strings.Split(value, " ")
+
+					if _, ok := oauthScopes[fields[0]]; !ok {
+						oauthScopes[fields[0]] = make(map[string]string, 0)
+					}
+
+					oauthScopes[fields[0]][fields[1]] = strings.Join(fields[2:], " ")
 				}
+			}
+		}
+	}
+
+	// Apply security scopes to their security schemes
+	for scheme, _ := range p.OpenAPI.Components.SecuritySchemes {
+		if p.OpenAPI.Components.SecuritySchemes[scheme].Type == "oauth2" {
+			if scopes, ok := oauthScopes[scheme]; ok {
+				p.OpenAPI.Components.SecuritySchemes[scheme].OAuthFlows.ApplyScopes(scopes)
 			}
 		}
 	}
