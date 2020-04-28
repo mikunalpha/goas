@@ -107,10 +107,10 @@ goas --module-path . --main-file-path ./cmd/xxx/main.go --output oas.json
 
 ### Response
 ```
-@Success  {stauts}  {jsonType}  {goType}       {description}
+@Success  {status}  {jsonType}  {goType}       {description}
 @Success  200       object      UsersResponse  "UsersResponse JSON"
 
-@Failure  {stauts}  {jsonType}  {goType}       {description}
+@Failure  {status}  {jsonType}  {goType}       {description}
 @Failure  400       object      ErrorResponse  "ErrorResponse JSON"
 ```
 - {status}: The HTTP status code.

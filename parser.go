@@ -887,7 +887,17 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 	if len(typeNameParts) == 1 {
 		typeSpec, exist = p.getTypeSpec(pkgPath, pkgName, typeName)
 		if !exist {
-			log.Fatalf("Can not find definition of %s ast.TypeSpec. Current package %s", typeName, pkgName)
+			for _, value := range p.KnownNamePkg {
+				typeSpec, exist = p.getTypeSpec(value.Path, value.Name, typeName)
+				if exist {
+					pkgPath = value.Path
+					pkgName = value.Name
+					break
+				}
+			}
+			if !exist {
+				log.Fatalf("Can not find definition of %s ast.TypeSpec. Current package %s", typeName, pkgName)
+			}
 		}
 		schemaObject.PkgName = pkgName
 		schemaObject.ID = genSchemeaObjectID(pkgName, typeName)
