@@ -213,14 +213,53 @@ type ComponentsOjbect struct {
 }
 
 type SecuritySchemeObject struct {
-	Type   string `json:"type"`   // Required
-	Scheme string `json:"scheme"` // Required
-
+	// Generic fields
+	Type        string `json:"type"` // Required
 	Description string `json:"description,omitempty"`
 
-	// Name
-	// In
+	// http
+	Scheme string `json:"scheme,omitempty"`
+
+	// apiKey
+	In   string `json:"in,omitempty"`
+	Name string `json:"name,omitempty"`
+
+	// OpenID
+	OpenIdConnectUrl string `json:"openIdConnectUrl,omitempty"`
+
+	// OAuth2
+	OAuthFlows *SecuritySchemeOauthObject `json:"flows,omitempty"`
+
 	// BearerFormat
-	// Flows
-	// OpenIDConnectURL
+}
+
+type SecuritySchemeOauthObject struct {
+	Implicit              *SecuritySchemeOauthFlowObject `json:"implicit,omitempty"`
+	AuthorizationCode     *SecuritySchemeOauthFlowObject `json:"authorizationCode,omitempty"`
+	ResourceOwnerPassword *SecuritySchemeOauthFlowObject `json:"password,omitempty"`
+	ClientCredentials     *SecuritySchemeOauthFlowObject `json:"clientCredentials,omitempty"`
+}
+
+func (s *SecuritySchemeOauthObject) ApplyScopes(scopes map[string]string) {
+	if s.Implicit != nil {
+		s.Implicit.Scopes = scopes
+	}
+
+	if s.AuthorizationCode != nil {
+		s.AuthorizationCode.Scopes = scopes
+	}
+
+	if s.ResourceOwnerPassword != nil {
+		s.ResourceOwnerPassword.Scopes = scopes
+	}
+
+	if s.ClientCredentials != nil {
+		s.ClientCredentials.Scopes = scopes
+	}
+}
+
+type SecuritySchemeOauthFlowObject struct {
+	AuthorizationUrl string            `json:"authorizationUrl,omitempty"`
+	TokenUrl         string            `json:"tokenUrl,omitempty"`
+	Scopes           map[string]string `json:"scopes"`
 }
