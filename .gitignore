@@ -1,2 +1,11 @@
 vendor
 glide.lock
+.DS_Store
+*.iml
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.beconf.tfvars
+**/out.plan
+crash.log
+.idea
