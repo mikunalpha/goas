@@ -8,3 +8,5 @@ github.com/urfave/cli v1.20.0 h1:fDqGv3UG/4jbVl/QkFwEdddtEDjh/5Ov6X+0B/3bPaw=
 github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijbERA=
 github.com/uudashr/go-module v0.0.0-20180827225833-c0ca9c3a4966 h1:7dS/ZO0dIwrtj/FGTt9I6urVpx7LEHzucegv4ORYK3M=
 github.com/uudashr/go-module v0.0.0-20180827225833-c0ca9c3a4966/go.mod h1:P6Nk1sQWL6jcdBIxnLVlqCsOl0arao7gg7sPoM6gx4A=
+github.com/uudashr/go-module v0.0.0-20200529023307-c90a4239ad70 h1:t/4GlAfaNAVbh8GqZmHl96pFwlaw7+DAwp2OjUMOxgw=
+github.com/uudashr/go-module v0.0.0-20200529023307-c90a4239ad70/go.mod h1:P6Nk1sQWL6jcdBIxnLVlqCsOl0arao7gg7sPoM6gx4A=
