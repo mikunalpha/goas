@@ -1,7 +1,11 @@
 # goas
 The project is based on  
 - [yvasiyarov/swagger](https://github.com/yvasiyarov/swagger) repository.  
-- [uudashr/go-module](https://github.com/uudashr/go-module) repository.
+- [uudashr/go-module](https://github.com/uudashr/go-module) repository. (currently deprecated)
+- [mikunalpha/goas](https://github.com/mikunalpha/goas) repository
+
+The reason for the fork was [#10](https://github.com/mikunalpha/goas/issues/10) and [#11](https://github.com/mikunalpha/goas/issues/11)
+
 
 Generate [OpenAPI Specification](https://swagger.io/specification) json file with comments in Go.
 
@@ -12,7 +16,7 @@ Generate [OpenAPI Specification](https://swagger.io/specification) json file wit
 ## Install
 
 ```
-go get -u github.com/mikunalpha/goas
+go get -u github.com/nicocesar/goas
 ```
 
 ## Usage
