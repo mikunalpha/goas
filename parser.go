@@ -19,7 +19,7 @@ import (
 	"unicode"
 
 	"github.com/iancoleman/orderedmap"
-	"github.com/mikunalpha/go-module"
+	module "golang.org/x/mod/modfile"
 )
 
 type parser struct {
@@ -400,19 +400,22 @@ func (p *parser) parseModule() error {
 	filepath.Walk(p.ModulePath, walker)
 	return nil
 }
+func fixer(path, version string) (string, error) {
+	return version, nil
+}
 
 func (p *parser) parseGoMod() error {
 	b, err := ioutil.ReadFile(p.GoModFilePath)
 	if err != nil {
 		return err
 	}
-	goMod, err := module.Parse(b)
+	goMod, err := module.ParseLax(p.GoModFilePath, b, fixer)
 	if err != nil {
 		return err
 	}
-	for i := range goMod.Requires {
+	for i := range goMod.Require {
 		pathRunes := []rune{}
-		for _, v := range goMod.Requires[i].Path {
+		for _, v := range goMod.Require[i].Mod.Path {
 			if !unicode.IsUpper(v) {
 				pathRunes = append(pathRunes, v)
 				continue
@@ -420,8 +423,8 @@ func (p *parser) parseGoMod() error {
 			pathRunes = append(pathRunes, '!')
 			pathRunes = append(pathRunes, unicode.ToLower(v))
 		}
-		pkgName := goMod.Requires[i].Path
-		pkgPath := filepath.Join(p.GoModCachePath, string(pathRunes)+"@"+goMod.Requires[i].Version)
+		pkgName := goMod.Require[i].Mod.Path
+		pkgPath := filepath.Join(p.GoModCachePath, string(pathRunes)+"@"+goMod.Require[i].Mod.Version)
 		pkgName = filepath.ToSlash(pkgName)
 		p.KnownPkgs = append(p.KnownPkgs, pkg{
 			Name: pkgName,
