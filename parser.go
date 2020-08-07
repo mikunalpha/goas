@@ -704,7 +704,7 @@ func (p *parser) parseParamComment(pkgPath, pkgName string, operation *Operation
 	description := matches[5]
 
 	// `file`, `form`
-	if in == "file" || in == "form" {
+	if in == "file" || in == "files" || in == "form" {
 		if operation.RequestBody == nil {
 			operation.RequestBody = &RequestBodyObject{
 				Content: map[string]*MediaTypeObject{
@@ -722,6 +722,15 @@ func (p *parser) parseParamComment(pkgPath, pkgName string, operation *Operation
 			operation.RequestBody.Content[ContentTypeForm].Schema.Properties.Set(name, &SchemaObject{
 				Type:        "string",
 				Format:      "binary",
+				Description: description,
+			})
+		} else if in == "files" {
+			operation.RequestBody.Content[ContentTypeForm].Schema.Properties.Set(name, &SchemaObject{
+				Type:        "array",
+				Items: &SchemaObject{
+					Type: "string",
+					Format: "binary",
+				},
 				Description: description,
 			})
 		} else if isGoTypeOASType(goType) {
