@@ -557,7 +557,9 @@ func (p *parser) parseTypeSpecs() error {
 		}
 		astPkgs, err := p.getPkgAst(pkgPath)
 		if err != nil {
-			return fmt.Errorf("parseTypeSpecs: parse of %s package cause error: %s", pkgPath, err)
+			// return fmt.Errorf("parseTypeSpecs: parse of %s package cause error: %s", pkgPath, err)
+			fmt.Printf("PARSE ERROR: parseTypeSpecs: parse of %s package cause error: %s\n", pkgPath, err)
+			continue
 		}
 		for _, astPackage := range astPkgs {
 			for _, astFile := range astPackage.Files {
@@ -614,7 +616,9 @@ func (p *parser) parsePaths() error {
 
 		astPkgs, err := p.getPkgAst(pkgPath)
 		if err != nil {
-			return fmt.Errorf("parsePaths: parse of %s package cause error: %s", pkgPath, err)
+			fmt.Printf("PARSEPATHS ERROR: parsePaths: parse of %s package cause error: %s\n", pkgPath, err)
+			continue
+			// return fmt.Errorf("parsePaths: parse of %s package cause error: %s", pkgPath, err)
 		}
 		for _, astPackage := range astPkgs {
 			for _, astFile := range astPackage.Files {
@@ -726,9 +730,9 @@ func (p *parser) parseParamComment(pkgPath, pkgName string, operation *Operation
 			})
 		} else if in == "files" {
 			operation.RequestBody.Content[ContentTypeForm].Schema.Properties.Set(name, &SchemaObject{
-				Type:        "array",
+				Type: "array",
 				Items: &SchemaObject{
-					Type: "string",
+					Type:   "string",
 					Format: "binary",
 				},
 				Description: description,
@@ -1326,6 +1330,10 @@ astFieldsLoop:
 			} else if len(fieldSchema.Ref) != 0 && len(fieldSchema.ID) != 0 {
 				refSchema, ok := p.KnownIDSchema[fieldSchema.ID]
 				if ok {
+					if refSchema.Properties == nil {
+						fmt.Println("nil refSchema.Properties")
+						continue
+					}
 					for _, propertyName := range refSchema.Properties.Keys() {
 						refPropertySchema, _ := refSchema.Properties.Get(propertyName)
 						_, disabled := structSchema.DisabledFieldNames[refPropertySchema.(*SchemaObject).FieldName]
