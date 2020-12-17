@@ -1,4 +1,4 @@
-module github.com/mikunalpha/goas
+module github.com/launchdarkly/goas
 
 go 1.12
 

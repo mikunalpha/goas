@@ -12,7 +12,7 @@ Generate [OpenAPI Specification](https://swagger.io/specification) json file wit
 ## Install
 
 ```
-go get -u github.com/mikunalpha/goas
+go get -u github.com/launchdarkly/goas
 ```
 
 ## Usage
