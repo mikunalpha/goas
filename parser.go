@@ -506,7 +506,9 @@ func (p *parser) parseImportStatements() error {
 
 		astPkgs, err := p.getPkgAst(pkgPath)
 		if err != nil {
-			return fmt.Errorf("parseImportStatements: parse of %s package cause error: %s", pkgPath, err)
+			fmt.Printf("parseImportStatements: parse of %s package cause error: %s\n", pkgPath, err)
+			continue
+			// return fmt.Errorf("parseImportStatements: parse of %s package cause error: %s", pkgPath, err)
 		}
 
 		p.PkgNameImportedPkgAlias[pkgName] = map[string][]string{}
@@ -557,9 +559,9 @@ func (p *parser) parseTypeSpecs() error {
 		}
 		astPkgs, err := p.getPkgAst(pkgPath)
 		if err != nil {
-			// return fmt.Errorf("parseTypeSpecs: parse of %s package cause error: %s", pkgPath, err)
 			fmt.Printf("PARSE ERROR: parseTypeSpecs: parse of %s package cause error: %s\n", pkgPath, err)
 			continue
+			// return fmt.Errorf("parseTypeSpecs: parse of %s package cause error: %s", pkgPath, err)
 		}
 		for _, astPackage := range astPkgs {
 			for _, astFile := range astPackage.Files {
@@ -938,7 +940,7 @@ func (p *parser) registerType(pkgPath, pkgName, typeName string) (string, error)
 		if err != nil {
 			return "", err
 		}
-		registerTypeName = schemaObject.ID
+		registerTypeName = getSchemaNameOnly(schemaObject.ID)
 		_, ok := p.OpenAPI.Components.Schemas[replaceBackslash(registerTypeName)]
 		if !ok {
 			p.OpenAPI.Components.Schemas[replaceBackslash(registerTypeName)] = schemaObject

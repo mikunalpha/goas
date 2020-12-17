@@ -160,3 +160,8 @@ func genSchemeaObjectID(pkgName, typeName string) string {
 func replaceBackslash(origin string) string {
 	return strings.ReplaceAll(origin, "\\", "/")
 }
+
+func getSchemaNameOnly(objectID string) string {
+	parts := strings.Split(objectID, ".")
+	return parts[len(parts)-1]
+}
