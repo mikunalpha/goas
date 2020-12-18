@@ -941,7 +941,6 @@ func (p *parser) registerType(pkgPath, pkgName, typeName string) (string, error)
 		if knownObj, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, typeName)]; ok {
 			schemaObject = knownObj
 		} else {
-
 			// if not, parse it now
 			parsedObject, err := p.parseSchemaObject(pkgPath, pkgName, typeName)
 			if err != nil {
@@ -949,13 +948,7 @@ func (p *parser) registerType(pkgPath, pkgName, typeName string) (string, error)
 			}
 			schemaObject = parsedObject
 		}
-
-		// write the schema object to the spec
 		registerTypeName = schemaObject.ID
-		_, ok := p.OpenAPI.Components.Schemas[replaceBackslash(registerTypeName)]
-		if !ok {
-			p.OpenAPI.Components.Schemas[replaceBackslash(registerTypeName)] = schemaObject
-		}
 	}
 	return registerTypeName, nil
 }
@@ -1109,6 +1102,13 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 		} else if isGoTypeOASType(typeAsString) {
 			propertySchema.Type = goTypesOASTypes[typeAsString]
 		}
+	}
+
+	// register schema object in spec tree if it doesn't exist
+	registerTypeName := schemaObject.ID
+	_, ok := p.OpenAPI.Components.Schemas[replaceBackslash(registerTypeName)]
+	if !ok {
+		p.OpenAPI.Components.Schemas[replaceBackslash(registerTypeName)] = &schemaObject
 	}
 
 	return &schemaObject, nil
