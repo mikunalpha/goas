@@ -933,14 +933,25 @@ func (p *parser) registerType(pkgPath, pkgName, typeName string) (string, error)
 
 	if isBasicGoType(typeName) {
 		registerTypeName = typeName
-	} else if _, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, typeName)]; ok {
-		return genSchemeaObjectID(pkgName, typeName), nil
 	} else {
-		schemaObject, err := p.parseSchemaObject(pkgPath, pkgName, typeName)
-		if err != nil {
-			return "", err
+
+		var schemaObject *SchemaObject
+
+		// see if we've already parsed this type
+		if knownObj, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, typeName)]; ok {
+			schemaObject = knownObj
+		} else {
+
+			// if not, parse it now
+			parsedObject, err := p.parseSchemaObject(pkgPath, pkgName, typeName)
+			if err != nil {
+				return "", err
+			}
+			schemaObject = parsedObject
 		}
-		registerTypeName = getSchemaNameOnly(schemaObject.ID)
+
+		// write the schema object to the spec
+		registerTypeName = schemaObject.ID
 		_, ok := p.OpenAPI.Components.Schemas[replaceBackslash(registerTypeName)]
 		if !ok {
 			p.OpenAPI.Components.Schemas[replaceBackslash(registerTypeName)] = schemaObject
