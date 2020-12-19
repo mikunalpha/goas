@@ -506,9 +506,8 @@ func (p *parser) parseImportStatements() error {
 
 		astPkgs, err := p.getPkgAst(pkgPath)
 		if err != nil {
-			fmt.Printf("parseImportStatements: parse of %s package cause error: %s\n", pkgPath, err)
+			p.debugf("parseImportStatements: parse of %s package cause error: %s\n", pkgPath, err)
 			continue
-			// return fmt.Errorf("parseImportStatements: parse of %s package cause error: %s", pkgPath, err)
 		}
 
 		p.PkgNameImportedPkgAlias[pkgName] = map[string][]string{}
@@ -559,9 +558,8 @@ func (p *parser) parseTypeSpecs() error {
 		}
 		astPkgs, err := p.getPkgAst(pkgPath)
 		if err != nil {
-			fmt.Printf("PARSE ERROR: parseTypeSpecs: parse of %s package cause error: %s\n", pkgPath, err)
+			p.debugf("parseTypeSpecs: parse of %s package cause error: %s\n", pkgPath, err)
 			continue
-			// return fmt.Errorf("parseTypeSpecs: parse of %s package cause error: %s", pkgPath, err)
 		}
 		for _, astPackage := range astPkgs {
 			for _, astFile := range astPackage.Files {
@@ -618,9 +616,8 @@ func (p *parser) parsePaths() error {
 
 		astPkgs, err := p.getPkgAst(pkgPath)
 		if err != nil {
-			fmt.Printf("PARSEPATHS ERROR: parsePaths: parse of %s package cause error: %s\n", pkgPath, err)
+			p.debugf("parsePaths: parse of %s package cause error: %s\n", pkgPath, err)
 			continue
-			// return fmt.Errorf("parsePaths: parse of %s package cause error: %s", pkgPath, err)
 		}
 		for _, astPackage := range astPkgs {
 			for _, astFile := range astPackage.Files {
@@ -1344,7 +1341,7 @@ astFieldsLoop:
 				refSchema, ok := p.KnownIDSchema[fieldSchema.ID]
 				if ok {
 					if refSchema.Properties == nil {
-						fmt.Println("nil refSchema.Properties")
+						p.debug("nil refSchema.Properties")
 						continue
 					}
 					for _, propertyName := range refSchema.Properties.Keys() {
