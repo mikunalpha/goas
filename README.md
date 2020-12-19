@@ -3,8 +3,9 @@ The project is based on
 - [yvasiyarov/swagger](https://github.com/yvasiyarov/swagger) repository.  
 - [uudashr/go-module](https://github.com/uudashr/go-module) repository. (currently deprecated)
 - [mikunalpha/goas](https://github.com/mikunalpha/goas) repository
+- [nicocesar/goas](https://github.com/nicocesar/goas) repository
 
-The reason for the fork was [#10](https://github.com/mikunalpha/goas/issues/10) and [#11](https://github.com/mikunalpha/goas/issues/11)
+This fork adapts the goas library for LaunchDarkly's API.
 
 
 Generate [OpenAPI Specification](https://swagger.io/specification) json file with comments in Go.
