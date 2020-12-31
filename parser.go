@@ -19,7 +19,7 @@ import (
 	"unicode"
 
 	"github.com/iancoleman/orderedmap"
-	"github.com/mikunalpha/go-module"
+	module "golang.org/x/mod/modfile"
 )
 
 type parser struct {
@@ -400,19 +400,22 @@ func (p *parser) parseModule() error {
 	filepath.Walk(p.ModulePath, walker)
 	return nil
 }
+func fixer(path, version string) (string, error) {
+	return version, nil
+}
 
 func (p *parser) parseGoMod() error {
 	b, err := ioutil.ReadFile(p.GoModFilePath)
 	if err != nil {
 		return err
 	}
-	goMod, err := module.Parse(b)
+	goMod, err := module.ParseLax(p.GoModFilePath, b, fixer)
 	if err != nil {
 		return err
 	}
-	for i := range goMod.Requires {
+	for i := range goMod.Require {
 		pathRunes := []rune{}
-		for _, v := range goMod.Requires[i].Path {
+		for _, v := range goMod.Require[i].Mod.Path {
 			if !unicode.IsUpper(v) {
 				pathRunes = append(pathRunes, v)
 				continue
@@ -420,8 +423,8 @@ func (p *parser) parseGoMod() error {
 			pathRunes = append(pathRunes, '!')
 			pathRunes = append(pathRunes, unicode.ToLower(v))
 		}
-		pkgName := goMod.Requires[i].Path
-		pkgPath := filepath.Join(p.GoModCachePath, string(pathRunes)+"@"+goMod.Requires[i].Version)
+		pkgName := goMod.Require[i].Mod.Path
+		pkgPath := filepath.Join(p.GoModCachePath, string(pathRunes)+"@"+goMod.Require[i].Mod.Version)
 		pkgName = filepath.ToSlash(pkgName)
 		p.KnownPkgs = append(p.KnownPkgs, pkg{
 			Name: pkgName,
@@ -647,7 +650,8 @@ func (p *parser) parseOperation(pkgPath, pkgName string, astComments []*ast.Comm
 	for _, astComment := range astComments {
 		comment := strings.TrimSpace(strings.TrimLeft(astComment.Text, "/"))
 		if len(comment) == 0 {
-			return nil
+			// ignore empty lines
+			continue
 		}
 		attribute := strings.Fields(comment)[0]
 		switch strings.ToLower(attribute) {
@@ -700,7 +704,7 @@ func (p *parser) parseParamComment(pkgPath, pkgName string, operation *Operation
 	description := matches[5]
 
 	// `file`, `form`
-	if in == "file" || in == "form" {
+	if in == "file" || in == "files" || in == "form" {
 		if operation.RequestBody == nil {
 			operation.RequestBody = &RequestBodyObject{
 				Content: map[string]*MediaTypeObject{
@@ -718,6 +722,15 @@ func (p *parser) parseParamComment(pkgPath, pkgName string, operation *Operation
 			operation.RequestBody.Content[ContentTypeForm].Schema.Properties.Set(name, &SchemaObject{
 				Type:        "string",
 				Format:      "binary",
+				Description: description,
+			})
+		} else if in == "files" {
+			operation.RequestBody.Content[ContentTypeForm].Schema.Properties.Set(name, &SchemaObject{
+				Type:        "array",
+				Items: &SchemaObject{
+					Type: "string",
+					Format: "binary",
+				},
 				Description: description,
 			})
 		} else if isGoTypeOASType(goType) {
@@ -800,53 +813,70 @@ func (p *parser) parseParamComment(pkgPath, pkgName string, operation *Operation
 func (p *parser) parseResponseComment(pkgPath, pkgName string, operation *OperationObject, comment string) error {
 	// {status}  {jsonType}  {goType}     {description}
 	// 201       object      models.User  "User Model"
-	re := regexp.MustCompile(`([\d]+)[\s]+([\w\{\}]+)[\s]+([\w\-\.\/\[\]]+)[^"]*(.*)?`)
+	// if 204 or something else without empty return payload
+	// 204 "User Model"
+	re := regexp.MustCompile(`(?P<status>[\d]+)[\s]*(?P<jsonType>[\w\{\}]+)?[\s]+(?P<goType>[\w\-\.\/\[\]]+)?[^"]*(?P<description>.*)?`)
 	matches := re.FindStringSubmatch(comment)
-	if len(matches) != 5 {
-		return fmt.Errorf("parseResponseComment can not parse response comment \"%s\"", comment)
+
+	paramsMap := make(map[string]string)
+	for i, name := range re.SubexpNames() {
+		if i > 0 && i <= len(matches) {
+			paramsMap[name] = matches[i]
+		}
 	}
 
-	status := matches[1]
-	_, err := strconv.Atoi(matches[1])
+	if len(matches) <= 2 {
+		return fmt.Errorf("parseResponseComment can not parse response comment \"%s\", matches: %v", comment, matches)
+	}
+
+	status := paramsMap["status"]
+	_, err := strconv.Atoi(status)
 	if err != nil {
 		return fmt.Errorf("parseResponseComment: http status must be int, but got %s", status)
 	}
-	switch matches[2] {
-	case "object", "array", "{object}", "{array}":
-	default:
-		return fmt.Errorf("parseResponseComment: invalid jsonType %s", matches[2])
+
+	// ignore type if not set
+	if jsonType := paramsMap["jsonType"]; jsonType != "" {
+		switch jsonType {
+		case "object", "array", "{object}", "{array}":
+		default:
+			return fmt.Errorf("parseResponseComment: invalid jsonType \"%s\"", paramsMap["jsonType"])
+		}
 	}
+
 	responseObject := &ResponseObject{
 		Content: map[string]*MediaTypeObject{},
 	}
-	responseObject.Description = strings.Trim(matches[4], "\"")
+	responseObject.Description = strings.Trim(paramsMap["description"], "\"")
 
-	re = regexp.MustCompile(`\[\w*\]`)
-	goType := re.ReplaceAllString(matches[3], "[]")
-	if strings.HasPrefix(goType, "[]") || strings.HasPrefix(goType, "map[]") {
-		schema, err := p.parseSchemaObject(pkgPath, pkgName, goType)
-		if err != nil {
-			p.debug("parseResponseComment cannot parse goType", goType)
-		}
-		responseObject.Content[ContentTypeJson] = &MediaTypeObject{
-			Schema: *schema,
-		}
-	} else {
-		typeName, err := p.registerType(pkgPath, pkgName, matches[3])
-		if err != nil {
-			return err
-		}
-		if isBasicGoType(typeName) {
-			responseObject.Content[ContentTypeText] = &MediaTypeObject{
-				Schema: SchemaObject{
-					Type: "string",
-				},
+	if goTypeRaw := paramsMap["goType"]; goTypeRaw != "" {
+		re = regexp.MustCompile(`\[\w*\]`)
+		goType := re.ReplaceAllString(goTypeRaw, "[]")
+		if strings.HasPrefix(goType, "[]") || strings.HasPrefix(goType, "map[]") {
+			schema, err := p.parseSchemaObject(pkgPath, pkgName, goType)
+			if err != nil {
+				p.debug("parseResponseComment: cannot parse goType", goType)
+			}
+			responseObject.Content[ContentTypeJson] = &MediaTypeObject{
+				Schema: *schema,
 			}
 		} else {
-			responseObject.Content[ContentTypeJson] = &MediaTypeObject{
-				Schema: SchemaObject{
-					Ref: addSchemaRefLinkPrefix(typeName),
-				},
+			typeName, err := p.registerType(pkgPath, pkgName, matches[3])
+			if err != nil {
+				return err
+			}
+			if isBasicGoType(typeName) {
+				responseObject.Content[ContentTypeText] = &MediaTypeObject{
+					Schema: SchemaObject{
+						Type: "string",
+					},
+				}
+			} else {
+				responseObject.Content[ContentTypeJson] = &MediaTypeObject{
+					Schema: SchemaObject{
+						Ref: addSchemaRefLinkPrefix(typeName),
+					},
+				}
 			}
 		}
 	}
@@ -964,7 +994,17 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 	if len(typeNameParts) == 1 {
 		typeSpec, exist = p.getTypeSpec(pkgPath, pkgName, typeName)
 		if !exist {
-			log.Fatalf("Can not find definition of %s ast.TypeSpec. Current package %s", typeName, pkgName)
+			for _, value := range p.KnownNamePkg {
+				typeSpec, exist = p.getTypeSpec(value.Path, value.Name, typeName)
+				if exist {
+					pkgPath = value.Path
+					pkgName = value.Name
+					break
+				}
+			}
+			if !exist {
+				log.Fatalf("Can not find definition of %s ast.TypeSpec. Current package %s", typeName, pkgName)
+			}
 		}
 		schemaObject.PkgName = pkgName
 		schemaObject.ID = genSchemeaObjectID(pkgName, typeName)
