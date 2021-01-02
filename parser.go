@@ -45,7 +45,8 @@ type parser struct {
 	PkgPathAstPkgCache      map[string]map[string]*ast.Package
 	PkgNameImportedPkgAlias map[string]map[string][]string
 
-	Debug bool
+	Debug  bool
+	Strict bool
 }
 
 type pkg struct {
@@ -53,7 +54,7 @@ type pkg struct {
 	Path string
 }
 
-func newParser(modulePath, mainFilePath, handlerPath string, debug bool) (*parser, error) {
+func newParser(modulePath, mainFilePath, handlerPath string, debug, strict bool) (*parser, error) {
 	p := &parser{
 		KnownPkgs:               []pkg{},
 		KnownNamePkg:            map[string]*pkg{},
@@ -63,6 +64,7 @@ func newParser(modulePath, mainFilePath, handlerPath string, debug bool) (*parse
 		PkgPathAstPkgCache:      map[string]map[string]*ast.Package{},
 		PkgNameImportedPkgAlias: map[string]map[string][]string{},
 		Debug:                   debug,
+		Strict:                  strict,
 	}
 	p.OpenAPI.OpenAPI = OpenAPIVersion
 	p.OpenAPI.Paths = make(PathsObject)
@@ -503,7 +505,12 @@ func (p *parser) parseImportStatements() error {
 
 		astPkgs, err := p.getPkgAst(pkgPath)
 		if err != nil {
-			return fmt.Errorf("parseImportStatements: parse of %s package cause error: %s", pkgPath, err)
+			if p.Strict {
+				return fmt.Errorf("parseImportStatements: parse of %s package cause error: %s", pkgPath, err)
+			}
+
+			p.debugf("parseImportStatements: parse of %s package cause error: %s", pkgPath, err)
+			continue
 		}
 
 		p.PkgNameImportedPkgAlias[pkgName] = map[string][]string{}
@@ -554,8 +561,14 @@ func (p *parser) parseTypeSpecs() error {
 		}
 		astPkgs, err := p.getPkgAst(pkgPath)
 		if err != nil {
-			return fmt.Errorf("parseTypeSpecs: parse of %s package cause error: %s", pkgPath, err)
+			if p.Strict {
+				return fmt.Errorf("parseTypeSpecs: parse of %s package cause error: %s", pkgPath, err)
+			}
+
+			p.debugf("parseTypeSpecs: parse of %s package cause error: %s", pkgPath, err)
+			continue
 		}
+
 		for _, astPackage := range astPkgs {
 			for _, astFile := range astPackage.Files {
 				for _, astDeclaration := range astFile.Decls {
@@ -611,8 +624,14 @@ func (p *parser) parsePaths() error {
 
 		astPkgs, err := p.getPkgAst(pkgPath)
 		if err != nil {
-			return fmt.Errorf("parsePaths: parse of %s package cause error: %s", pkgPath, err)
+			if p.Strict {
+				return fmt.Errorf("parsePaths: parse of %s package cause error: %s", pkgPath, err)
+			}
+
+			p.debugf("parsePaths: parse of %s package cause error: %s", pkgPath, err)
+			continue
 		}
+
 		for _, astPackage := range astPkgs {
 			for _, astFile := range astPackage.Files {
 				for _, astDeclaration := range astFile.Decls {
