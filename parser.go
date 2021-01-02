@@ -842,13 +842,38 @@ func (p *parser) parseResponseComment(pkgPath, pkgName string, operation *Operat
 
 	re = regexp.MustCompile(`\[\w*\]`)
 	goType := re.ReplaceAllString(matches[3], "[]")
-	if strings.HasPrefix(goType, "[]") || strings.HasPrefix(goType, "map[]") {
+	if strings.HasPrefix(goType, "map[]") {
 		schema, err := p.parseSchemaObject(pkgPath, pkgName, goType)
 		if err != nil {
 			p.debug("parseResponseComment cannot parse goType", goType)
 		}
 		responseObject.Content[ContentTypeJson] = &MediaTypeObject{
 			Schema: *schema,
+		}
+	} else if strings.HasPrefix(goType, "[]") {
+		goType = strings.Replace(goType, "[]", "", -1)
+		typeName, err := p.registerType(pkgPath, pkgName, goType)
+		if err != nil {
+			return err
+		}
+
+		var s SchemaObject
+
+		if isBasicGoType(typeName) {
+			s = SchemaObject{
+				Type: "string",
+			}
+		} else {
+			s = SchemaObject{
+				Ref: addSchemaRefLinkPrefix(typeName),
+			}
+		}
+
+		responseObject.Content[ContentTypeJson] = &MediaTypeObject{
+			Schema: SchemaObject{
+				Type:  "array",
+				Items: &s,
+			},
 		}
 	} else {
 		typeName, err := p.registerType(pkgPath, pkgName, matches[3])
