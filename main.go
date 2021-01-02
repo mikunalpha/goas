@@ -7,7 +7,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-var version = "v1.0.0"
+var version = "v1.0.1"
 
 var flags = []cli.Flag{
 	cli.StringFlag{
@@ -34,10 +34,14 @@ var flags = []cli.Flag{
 		Name:  "debug",
 		Usage: "show debug message",
 	},
+	cli.BoolFlag{
+		Name:  "strict",
+		Usage: "convert go parsing warnings to fatal errors",
+	},
 }
 
 func action(c *cli.Context) error {
-	p, err := newParser(c.GlobalString("module-path"), c.GlobalString("main-file-path"), c.GlobalString("handler-path"), c.GlobalBool("debug"))
+	p, err := newParser(c.GlobalString("module-path"), c.GlobalString("main-file-path"), c.GlobalString("handler-path"), c.GlobalBool("debug"), c.GlobalBool("strict"))
 	if err != nil {
 		return err
 	}
