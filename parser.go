@@ -638,6 +638,21 @@ func (p *parser) parsePaths() error {
 	return nil
 }
 
+func isHidden(astComments []*ast.Comment) bool {
+	for _, astComment := range astComments {
+		comment := strings.TrimSpace(strings.TrimLeft(astComment.Text, "/"))
+		if len(comment) == 0 {
+			// ignore empty lines
+			continue
+		}
+		attribute := strings.Fields(comment)[0]
+		if strings.ToLower(attribute) == "@hidden" {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *parser) parseOperation(pkgPath, pkgName string, astComments []*ast.Comment) error {
 	operation := &OperationObject{
 		Responses: map[string]*ResponseObject{},
@@ -647,6 +662,9 @@ func (p *parser) parseOperation(pkgPath, pkgName string, astComments []*ast.Comm
 		// p.debugf("parseOperation ignores %s", pkgPath)
 		return nil
 	} else if p.HandlerPath != "" && !strings.HasPrefix(pkgPath, p.HandlerPath) {
+		return nil
+	}
+	if isHidden(astComments) {
 		return nil
 	}
 	var err error
