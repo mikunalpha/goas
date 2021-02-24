@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode"
@@ -520,8 +521,10 @@ func (p *parser) parseImportStatements() error {
 		}
 
 		p.PkgNameImportedPkgAlias[pkgName] = map[string][]string{}
-		for _, astPackage := range astPkgs {
-			for _, astFile := range astPackage.Files {
+		for _, astPackageKey := range sortedPackageKeys(astPkgs) {
+			astPackage := astPkgs[astPackageKey]
+			for _, astFileKey := range sortedFileKeys(astPackage.Files) {
+				astFile := astPackage.Files[astFileKey]
 				for _, astImport := range astFile.Imports {
 					importedPkgName := strings.Trim(astImport.Path.Value, "\"")
 					importedPkgAlias := ""
@@ -570,8 +573,10 @@ func (p *parser) parseTypeSpecs() error {
 			p.debugf("parseTypeSpecs: parse of %s package cause error: %s\n", pkgPath, err)
 			continue
 		}
-		for _, astPackage := range astPkgs {
-			for _, astFile := range astPackage.Files {
+		for _, astPackageKey := range sortedPackageKeys(astPkgs) {
+			astPackage := astPkgs[astPackageKey]
+			for _, astFileKey := range sortedFileKeys(astPackage.Files) {
+				astFile := astPackage.Files[astFileKey]
 				for _, astDeclaration := range astFile.Decls {
 					if astGenDeclaration, ok := astDeclaration.(*ast.GenDecl); ok && astGenDeclaration.Tok == token.TYPE {
 						// find type declaration
@@ -628,8 +633,10 @@ func (p *parser) parsePaths() error {
 			p.debugf("parsePaths: parse of %s package cause error: %s\n", pkgPath, err)
 			continue
 		}
-		for _, astPackage := range astPkgs {
-			for _, astFile := range astPackage.Files {
+		for _, astPackageKey := range sortedPackageKeys(astPkgs) {
+			astPackage := astPkgs[astPackageKey]
+			for _, astFileKey := range sortedFileKeys(astPackage.Files) {
+				astFile := astPackage.Files[astFileKey]
 				for _, astDeclaration := range astFile.Decls {
 					if astFuncDeclaration, ok := astDeclaration.(*ast.FuncDecl); ok {
 						if astFuncDeclaration.Doc != nil && astFuncDeclaration.Doc.List != nil {
@@ -1433,4 +1440,26 @@ func (p *parser) debugf(format string, args ...interface{}) {
 	if p.Debug {
 		log.Printf(format, args...)
 	}
+}
+
+func sortedPackageKeys(m map[string]*ast.Package) ([]string) {
+	keys := make([]string, len(m))
+	i := 0
+	for k, _ := range m {
+		keys[i] = k
+		i++
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func sortedFileKeys(m map[string]*ast.File) ([]string) {
+	keys := make([]string, len(m))
+	i := 0
+	for k, _ := range m {
+		keys[i] = k
+		i++
+	}
+	sort.Strings(keys)
+	return keys
 }
