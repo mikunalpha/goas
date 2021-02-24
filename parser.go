@@ -174,7 +174,7 @@ func newParser(modulePath, mainFilePath, handlerPath string, debug bool) (*parse
 	return p, nil
 }
 
-func (p *parser) CreateOASFile(path string) error {
+func (p *parser) parse() error {
 	// parse basic info
 	err := p.parseInfo()
 	if err != nil {
@@ -196,6 +196,15 @@ func (p *parser) CreateOASFile(path string) error {
 	// parse APIs info
 	err = p.parseAPIs()
 	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+
+func (p *parser) CreateOASFile(path string) error {
+	if err := p.parse(); err != nil {
 		return err
 	}
 
