@@ -1077,8 +1077,9 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 			// p.debugf("guess %s ast.TypeSpec in package %s", guessTypeName, guessPkgName)
 			typeSpec, exist = p.getTypeSpec(guessPkgPath, guessPkgName, guessTypeName)
 			if !exist {
-				p.debugf("can not find definition of guess %s ast.TypeSpec in package %s", guessTypeName, guessPkgName)
-				return &schemaObject, nil
+				log.Fatalf("Cannot find definition of guess %s ast.TypeSpec in package %s. " +
+					"If definition is in a vendor dependency, try running `go mod tidy && go mod vendor`",
+					guessTypeName, guessPkgName)
 			}
 			schemaObject.PkgName = guessPkgName
 			schemaObject.ID = genSchemeaObjectID(guessPkgName, guessTypeName)
