@@ -1,9 +1,16 @@
 package main
 
+import (
+	"encoding/json"
+	"time"
+)
+
 type FooResponse struct {
 	ID        string          `json:"id"`
 	Bar       string          `json:"bar"`
 	Baz       string          `json:"baz"`
+	startDate time.Time       `json:"startDate"`
+	Msg       json.RawMessage `json:"msg"`
 	InnerFoos []InnerFoo      `json:"foo"`
 }
 

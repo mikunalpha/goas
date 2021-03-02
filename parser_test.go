@@ -134,6 +134,13 @@ func TestExample(t *testing.T) {
                "baz":{
                   "type":"string"
                },
+               "startDate":{
+                  "type":"string",
+                  "format":"date-time"
+               },
+               "msg":{
+                  "type":"object"
+               },
                "foo":{
                   "type":"array",
                   "items":{
