@@ -34,9 +34,11 @@ type parser struct {
 	GoModFilePath string
 
 	GoModCachePath string
+	GoRootSrcPath string
 
 	OpenAPI OpenAPIObject
 
+	CorePkgs	  map[string]bool
 	KnownPkgs     []pkg
 	KnownNamePkg  map[string]*pkg
 	KnownPathPkg  map[string]*pkg
@@ -56,6 +58,7 @@ type pkg struct {
 
 func newParser(modulePath, mainFilePath, handlerPath string, debug bool) (*parser, error) {
 	p := &parser{
+		CorePkgs:	        	 map[string]bool{},
 		KnownPkgs:               []pkg{},
 		KnownNamePkg:            map[string]*pkg{},
 		KnownPathPkg:            map[string]*pkg{},
@@ -138,6 +141,10 @@ func newParser(modulePath, mainFilePath, handlerPath string, debug bool) (*parse
 
 	// check go module cache path is exist ($GOPATH/pkg/mod)
 	goPath := os.Getenv("GOPATH")
+	// If GOPATH contains multiple paths use the last
+	// TODO: choosing the last is arbritrary; handle this better
+	goPathParts := strings.Split(goPath, ":")
+	goPath = goPathParts[len(goPathParts)-1]
 	if goPath == "" {
 		user, err := user.Current()
 		if err != nil {
@@ -158,6 +165,24 @@ func newParser(modulePath, mainFilePath, handlerPath string, debug bool) (*parse
 	}
 	p.GoModCachePath = goModCachePath
 	p.debugf("go module cache path: %s", p.GoModCachePath)
+
+	goRoot := os.Getenv("GOROOT")
+	if goRoot == "" {
+		return nil, fmt.Errorf("cannot get GOROOT")
+	}
+	goRootSrcPath := filepath.Join(goRoot, "src")
+	_, err = os.Stat(goRootSrcPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, err
+		}
+		return nil, fmt.Errorf("cannot get information of %s: %s", goRootSrcPath, err)
+	}
+	if !goModCacheInfo.IsDir() {
+		return nil, fmt.Errorf("%s should be a directory", goRootSrcPath)
+	}
+	p.GoRootSrcPath = goRootSrcPath
+	p.debugf("go root src path: %s", p.GoRootSrcPath)
 
 	if handlerPath != "" {
 		handlerPath, _ = filepath.Abs(handlerPath)
@@ -190,6 +215,12 @@ func (p *parser) parse() error {
 
 	// parse go.mod info
 	err = p.parseGoMod()
+	if err != nil {
+		return err
+	}
+
+	// parse core packages
+	err = p.parseGoRoot()
 	if err != nil {
 		return err
 	}
@@ -471,6 +502,22 @@ func (p *parser) parseGoMod() error {
 			p.debug(p.KnownPkgs[i].Name, "->", p.KnownPkgs[i].Path)
 		}
 	}
+	return nil
+}
+
+func (p *parser) parseGoRoot() error {
+	walker := func(path string, info os.FileInfo, err error) error {
+		if info != nil && info.IsDir() {
+			fns, err := filepath.Glob(filepath.Join(path, "*.go"))
+			if len(fns) == 0 || err != nil {
+				return nil
+			}
+			name := strings.TrimPrefix(filepath.ToSlash(strings.TrimPrefix(path, p.GoRootSrcPath)), "/")
+			p.CorePkgs[name] = true
+		}
+		return nil
+	}
+	filepath.Walk(p.GoRootSrcPath, walker)
 	return nil
 }
 
@@ -1084,6 +1131,12 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 			// p.debugf("guess %s ast.TypeSpec in package %s", guessTypeName, guessPkgName)
 			typeSpec, exist = p.getTypeSpec(guessPkgPath, guessPkgName, guessTypeName)
 			if !exist {
+				if p.CorePkgs[guessPkgName] == true {
+					p.debugf("Ignoring missing type %s in core package %s", guessTypeName, guessPkgName)
+					schemaObject.Type = "object"
+					return &schemaObject, nil
+				}
+
 				log.Fatalf("Cannot find definition of guess %s ast.TypeSpec in package %s. " +
 					"If definition is in a vendor dependency, try running `go mod tidy && go mod vendor`",
 					guessTypeName, guessPkgName)
@@ -1211,8 +1264,14 @@ astFieldsLoop:
 					if schema.Items != nil {
 						fieldSchema.Items = schema.Items
 					}
+					fieldSchema.Ref = addSchemaRefLinkPrefix(fieldSchemaSchemeaObjectID)
+				} else {
+					fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
+					if err != nil {
+						p.debug(err)
+						return
+					}
 				}
-				fieldSchema.Ref = addSchemaRefLinkPrefix(fieldSchemaSchemeaObjectID)
 			}
 		} else if isGoTypeOASType(typeAsString) {
 			fieldSchema.Type = goTypesOASTypes[typeAsString]
