@@ -34,11 +34,11 @@ type parser struct {
 	GoModFilePath string
 
 	GoModCachePath string
-	GoRootSrcPath string
+	GoRootSrcPath  string
 
 	OpenAPI OpenAPIObject
 
-	CorePkgs	  map[string]bool
+	CorePkgs      map[string]bool
 	KnownPkgs     []pkg
 	KnownNamePkg  map[string]*pkg
 	KnownPathPkg  map[string]*pkg
@@ -58,7 +58,7 @@ type pkg struct {
 
 func newParser(modulePath, mainFilePath, handlerPath string, debug bool) (*parser, error) {
 	p := &parser{
-		CorePkgs:	        	 map[string]bool{},
+		CorePkgs:                map[string]bool{},
 		KnownPkgs:               []pkg{},
 		KnownNamePkg:            map[string]*pkg{},
 		KnownPathPkg:            map[string]*pkg{},

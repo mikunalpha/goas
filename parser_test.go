@@ -138,9 +138,9 @@ func TestExample(t *testing.T) {
                   "type":"string",
                   "format":"date-time"
                },
-			   "msg":{
-				  "type":"object"
-			   },
+               "msg":{
+                  "type":"object"
+               },
                "foo":{
                   "type":"array",
                   "items":{
