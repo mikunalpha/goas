@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -166,7 +167,7 @@ func newParser(modulePath, mainFilePath, handlerPath string, debug bool) (*parse
 	p.GoModCachePath = goModCachePath
 	p.debugf("go module cache path: %s", p.GoModCachePath)
 
-	goRoot := os.Getenv("GOROOT")
+	goRoot := runtime.GOROOT()
 	if goRoot == "" {
 		return nil, fmt.Errorf("cannot get GOROOT")
 	}
