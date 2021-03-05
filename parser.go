@@ -1057,15 +1057,14 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 		itemTypeName := typeName[5:]
 		schema, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, itemTypeName)]
 		if ok {
-			schemaObject.Items = &SchemaObject{Ref: addSchemaRefLinkPrefix(schema.ID)}
+			schemaObject.AdditionalProperties = &SchemaObject{Ref: addSchemaRefLinkPrefix(schema.ID)}
 			return &schemaObject, nil
 		}
 		schemaProperty, err := p.parseSchemaObject(pkgPath, pkgName, itemTypeName)
 		if err != nil {
 			return nil, err
 		}
-		schemaObject.Properties = orderedmap.New()
-		schemaObject.Properties.Set("key", schemaProperty)
+		schemaObject.AdditionalProperties =  schemaProperty
 		return &schemaObject, nil
 	} else if typeName == "time.Time" {
 		schemaObject.Type = "string"

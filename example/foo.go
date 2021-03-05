@@ -7,11 +7,14 @@ import (
 
 type FooResponse struct {
 	ID        string          `json:"id"`
-	Bar       string          `json:"bar"`
-	Baz       string          `json:"baz"`
-	startDate time.Time       `json:"startDate"`
+	StartDate time.Time       `json:"startDate"`
 	Msg       json.RawMessage `json:"msg"`
 	InnerFoos []InnerFoo      `json:"foo"`
+	Environments map[string]Environment `json:"environments"`
+}
+
+type Environment struct {
+	Name string `json:"name"`
 }
 
 // @Title Get all foos
