@@ -14,177 +14,190 @@ func TestExample(t *testing.T) {
 	err = p.parse()
 	require.NoError(t, err)
 
-	bts, err := json.Marshal(p.OpenAPI)
+	bts, err := json.MarshalIndent(p.OpenAPI, "", "    ")
 	require.NoError(t, err)
 
 	expected := `
 {
-   "openapi":"3.0.0",
-   "info":{
-      "title":"LaunchDarkly REST API",
-      "description":"Build custom integrations with the LaunchDarkly REST API",
-      "contact":{
-         "name":"LaunchDarkly Technical Support Team",
-         "url":"https://support.launchdarkly.com",
-         "email":"support@launchdarkly.com"
-      },
-      "license":{
-         "name":"Apache 2.0",
-         "url":"https://www.apache.org/licenses/LICENSE-2.0"
-      },
-      "version":"2.0"
-   },
-   "servers":[
-      {
-         "url":"https://app.launchdarkly.com"
-      }
-   ],
-   "paths":{
-      "/api/v2/foo":{
-         "get":{
-            "responses":{
-               "200":{
-                  "description":"Successful foo response",
-                  "content":{
-                     "application/json":{
-                        "schema":{
-                           "$ref":"#/components/schemas/FooResponse"
-                        }
-                     }
-                  }
-               },
-               "401":{
-                  "description":"Invalid access token"
-               },
-               "403":{
-                  "description":"Forbidden"
-               },
-               "404":{
-                  "description":"Invalid resource identifier"
-               }
+    "components": {
+        "schemas": {
+            "Environment": {
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
             },
-            "summary":"Get all foos",
-            "description":" Get all foos"
-         },
-         "put":{
-            "responses":{
-               "200":{
-                  "description":"Successful foo response",
-                  "content":{
-                     "application/json":{
-                        "schema":{
-                           "$ref":"#/components/schemas/FooResponse"
-                        }
-                     }
-                  }
-               },
-               "401":{
-                  "description":"Invalid access token"
-               },
-               "403":{
-                  "description":"Forbidden"
-               },
-               "404":{
-                  "description":"Invalid resource identifier"
-               }
-            },
-            "summary":"Put foo",
-            "description":" Overwrite a foo"
-         }
-      },
-      "/api/v2/foo/{id}/inner":{
-         "put":{
-            "responses":{
-               "200":{
-                  "description":"Successful innerfoo response",
-                  "content":{
-                     "application/json":{
-                        "schema":{
-                           "$ref":"#/components/schemas/InnerFoo"
-                        }
-                     }
-                  }
-               },
-               "401":{
-                  "description":"Invalid access token"
-               },
-               "403":{
-                  "description":"Forbidden"
-               },
-               "404":{
-                  "description":"Invalid resource identifier"
-               }
-            },
-            "summary":"Get inner foos",
-            "description":" Get Inner Foos"
-         }
-      }
-   },
-   "components":{
-      "schemas":{
-         "FooResponse":{
-            "type":"object",
-            "properties":{
-               "id":{
-                  "type":"string"
-               },
-               "bar":{
-                  "type":"string"
-               },
-               "baz":{
-                  "type":"string"
-               },
-               "startDate":{
-                  "type":"string",
-                  "format":"date-time"
-               },
-               "msg":{
-                  "type":"object"
-               },
-               "foo":{
-                  "type":"array",
-                  "items":{
-                     "type":"object",
-                     "properties":{
-                        "a":{
-                           "type":"string"
+            "FooResponse": {
+                "properties": {
+                    "environments": {
+                        "additionalProperties": {
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
                         },
-                        "b":{
-                           "type":"string"
-                        }
-                     }
-                  }
-               }
+                        "type": "object"
+                    },
+                    "foo": {
+                        "items": {
+                            "properties": {
+                                "a": {
+                                    "type": "string"
+                                },
+                                "b": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "type": "array"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "msg": {
+                        "type": "object"
+                    },
+                    "startDate": {
+                        "format": "date-time",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "InnerFoo": {
+                "properties": {
+                    "a": {
+                        "type": "string"
+                    },
+                    "b": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
             }
-         },
-         "InnerFoo":{
-            "type":"object",
-            "properties":{
-               "a":{
-                  "type":"string"
-               },
-               "b":{
-                  "type":"string"
-               }
+        },
+        "securitySchemes": {
+            "ApiKey": {
+                "in": "header",
+                "name": "Authorization",
+                "type": "apiKey"
             }
-         }
-      },
-      "securitySchemes":{
-         "ApiKey":{
-            "type":"apiKey",
-            "in":"header",
-            "name":"Authorization"
-         }
-      }
-   },
-   "security":[
-      {
-         "ApiKey":[
-            "read",
-            "write"
-         ]
-      }
-   ]
+        }
+    },
+    "info": {
+        "contact": {
+            "email": "support@launchdarkly.com",
+            "name": "LaunchDarkly Technical Support Team",
+            "url": "https://support.launchdarkly.com"
+        },
+        "description": "Build custom integrations with the LaunchDarkly REST API",
+        "license": {
+            "name": "Apache 2.0",
+            "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        },
+        "title": "LaunchDarkly REST API",
+        "version": "2.0"
+    },
+    "openapi": "3.0.0",
+    "paths": {
+        "/api/v2/foo": {
+            "get": {
+                "description": " Get all foos",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FooResponse"
+                                }
+                            }
+                        },
+                        "description": "Successful foo response"
+                    },
+                    "401": {
+                        "description": "Invalid access token"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "description": "Invalid resource identifier"
+                    }
+                },
+                "summary": "Get all foos"
+            },
+            "put": {
+                "description": " Overwrite a foo",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FooResponse"
+                                }
+                            }
+                        },
+                        "description": "Successful foo response"
+                    },
+                    "401": {
+                        "description": "Invalid access token"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "description": "Invalid resource identifier"
+                    }
+                },
+                "summary": "Put foo"
+            }
+        },
+        "/api/v2/foo/{id}/inner": {
+            "put": {
+                "description": " Get Inner Foos",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InnerFoo"
+                                }
+                            }
+                        },
+                        "description": "Successful innerfoo response"
+                    },
+                    "401": {
+                        "description": "Invalid access token"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "description": "Invalid resource identifier"
+                    }
+                },
+                "summary": "Get inner foos"
+            }
+        }
+    },
+    "security": [
+        {
+            "ApiKey": [
+                "read",
+                "write"
+            ]
+        }
+    ],
+    "servers": [
+        {
+            "url": "https://app.launchdarkly.com"
+        }
+    ]
 }
 `
 	require.JSONEq(t, expected, string(bts))

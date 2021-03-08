@@ -235,7 +235,6 @@ func (p *parser) parse() error {
 	return nil
 }
 
-
 func (p *parser) CreateOASFile(path string) error {
 	if err := p.parse(); err != nil {
 		return err
@@ -1057,15 +1056,14 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 		itemTypeName := typeName[5:]
 		schema, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, itemTypeName)]
 		if ok {
-			schemaObject.Items = &SchemaObject{Ref: addSchemaRefLinkPrefix(schema.ID)}
+			schemaObject.AdditionalProperties = &SchemaObject{Ref: addSchemaRefLinkPrefix(schema.ID)}
 			return &schemaObject, nil
 		}
 		schemaProperty, err := p.parseSchemaObject(pkgPath, pkgName, itemTypeName)
 		if err != nil {
 			return nil, err
 		}
-		schemaObject.Properties = orderedmap.New()
-		schemaObject.Properties.Set("key", schemaProperty)
+		schemaObject.AdditionalProperties = schemaProperty
 		return &schemaObject, nil
 	} else if typeName == "time.Time" {
 		schemaObject.Type = "string"
@@ -1138,7 +1136,7 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 					return &schemaObject, nil
 				}
 
-				log.Fatalf("Cannot find definition of guess %s ast.TypeSpec in package %s. " +
+				log.Fatalf("Cannot find definition of guess %s ast.TypeSpec in package %s. "+
 					"If definition is in a vendor dependency, try running `go mod tidy && go mod vendor`",
 					guessTypeName, guessPkgName)
 			}
@@ -1503,7 +1501,7 @@ func (p *parser) debugf(format string, args ...interface{}) {
 	}
 }
 
-func sortedPackageKeys(m map[string]*ast.Package) ([]string) {
+func sortedPackageKeys(m map[string]*ast.Package) []string {
 	keys := make([]string, len(m))
 	i := 0
 	for k, _ := range m {
@@ -1514,7 +1512,7 @@ func sortedPackageKeys(m map[string]*ast.Package) ([]string) {
 	return keys
 }
 
-func sortedFileKeys(m map[string]*ast.File) ([]string) {
+func sortedFileKeys(m map[string]*ast.File) []string {
 	keys := make([]string, len(m))
 	i := 0
 	for k, _ := range m {
