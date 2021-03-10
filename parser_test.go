@@ -31,6 +31,12 @@ func TestExample(t *testing.T) {
             },
             "FooResponse": {
                 "properties": {
+					"count": {
+                        "type": "integer"
+                    },
+                    "endDate": {
+                        "type": "integer"
+                    },
                     "environments": {
                         "additionalProperties": {
                             "properties": {

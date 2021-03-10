@@ -5,9 +5,13 @@ import (
 	"time"
 )
 
+type UnixMillis int64
+
 type FooResponse struct {
 	ID        string          `json:"id"`
 	StartDate time.Time       `json:"startDate"`
+	EndDate   UnixMillis      `json:"endDate"`
+	Count     int64           `json:"count"`
 	Msg       json.RawMessage `json:"msg"`
 	InnerFoos []InnerFoo      `json:"foo"`
 	Environments map[string]Environment `json:"environments"`
