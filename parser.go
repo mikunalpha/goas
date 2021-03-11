@@ -1016,7 +1016,7 @@ func (p *parser) registerType(pkgPath, pkgName, typeName string) (string, error)
 		var schemaObject *SchemaObject
 
 		// see if we've already parsed this type
-		if knownObj, ok := p.KnownIDSchema[genSchemaObjectID(pkgName, typeName)]; ok {
+		if knownObj, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, typeName)]; ok {
 			schemaObject = knownObj
 		} else {
 			// if not, parse it now
@@ -1041,7 +1041,7 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 	if strings.HasPrefix(typeName, "[]") {
 		schemaObject.Type = "array"
 		itemTypeName := typeName[2:]
-		schema, ok := p.KnownIDSchema[genSchemaObjectID(pkgName, itemTypeName)]
+		schema, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, itemTypeName)]
 		if ok {
 			schemaObject.Items = &SchemaObject{Ref: addSchemaRefLinkPrefix(schema.ID)}
 			return &schemaObject, nil
@@ -1054,7 +1054,7 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 	} else if strings.HasPrefix(typeName, "map[]") {
 		schemaObject.Type = "object"
 		itemTypeName := typeName[5:]
-		schema, ok := p.KnownIDSchema[genSchemaObjectID(pkgName, itemTypeName)]
+		schema, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, itemTypeName)]
 		if ok {
 			schemaObject.AdditionalProperties = &SchemaObject{Ref: addSchemaRefLinkPrefix(schema.ID)}
 			return &schemaObject, nil
@@ -1094,7 +1094,7 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 			}
 		}
 		schemaObject.PkgName = pkgName
-		schemaObject.ID = genSchemaObjectID(pkgName, typeName)
+		schemaObject.ID = genSchemeaObjectID(pkgName, typeName)
 		p.KnownIDSchema[schemaObject.ID] = &schemaObject
 	} else {
 		guessPkgName := strings.Join(typeNameParts[:len(typeNameParts)-1], "/")
@@ -1142,7 +1142,7 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 					guessTypeName, guessPkgName)
 			}
 			schemaObject.PkgName = guessPkgName
-			schemaObject.ID = genSchemaObjectID(guessPkgName, guessTypeName)
+			schemaObject.ID = genSchemeaObjectID(guessPkgName, guessTypeName)
 			p.KnownIDSchema[schemaObject.ID] = &schemaObject
 		}
 		pkgPath, pkgName = guessPkgPath, guessPkgName
@@ -1163,11 +1163,11 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 		typeAsString := p.getTypeAsString(astArrayType.Elt)
 		typeAsString = strings.TrimLeft(typeAsString, "*")
 		if !isBasicGoType(typeAsString) {
-			schemaItemsSchemaObjectID, err := p.registerType(pkgPath, pkgName, typeAsString)
+			schemaItemsSchemeaObjectID, err := p.registerType(pkgPath, pkgName, typeAsString)
 			if err != nil {
 				p.debug("parseSchemaObject parse array items err:", err)
 			} else {
-				schemaObject.Items.Ref = addSchemaRefLinkPrefix(schemaItemsSchemaObjectID)
+				schemaObject.Items.Ref = addSchemaRefLinkPrefix(schemaItemsSchemeaObjectID)
 			}
 		} else if isGoTypeOASType(typeAsString) {
 			schemaObject.Items.Type = goTypesOASTypes[typeAsString]
@@ -1180,11 +1180,11 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 		typeAsString := p.getTypeAsString(astMapType.Value)
 		typeAsString = strings.TrimLeft(typeAsString, "*")
 		if !isBasicGoType(typeAsString) {
-			schemaItemsSchemaObjectID, err := p.registerType(pkgPath, pkgName, typeAsString)
+			schemaItemsSchemeaObjectID, err := p.registerType(pkgPath, pkgName, typeAsString)
 			if err != nil {
 				p.debug("parseSchemaObject parse array items err:", err)
 			} else {
-				propertySchema.Ref = addSchemaRefLinkPrefix(schemaItemsSchemaObjectID)
+				propertySchema.Ref = addSchemaRefLinkPrefix(schemaItemsSchemeaObjectID)
 			}
 		} else if isGoTypeOASType(typeAsString) {
 			propertySchema.Type = goTypesOASTypes[typeAsString]
@@ -1255,14 +1255,14 @@ astFieldsLoop:
 				return
 			}
 		} else if !isBasicGoType(typeAsString) {
-			fieldSchemaSchemaObjectID, err := p.registerType(pkgPath, pkgName, typeAsString)
+			fieldSchemaSchemeaObjectID, err := p.registerType(pkgPath, pkgName, typeAsString)
 			if err != nil {
 				p.debug("parseSchemaPropertiesFromStructFields err:", err)
 			} else {
-				fieldSchema.ID = fieldSchemaSchemaObjectID
-				_, ok := p.KnownIDSchema[fieldSchemaSchemaObjectID]
+				fieldSchema.ID = fieldSchemaSchemeaObjectID
+				_, ok := p.KnownIDSchema[fieldSchemaSchemeaObjectID]
 				if ok {
-					fieldSchema.Ref = addSchemaRefLinkPrefix(fieldSchemaSchemaObjectID)
+					fieldSchema.Ref = addSchemaRefLinkPrefix(fieldSchemaSchemeaObjectID)
 				} else {
 					fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
 					if err != nil {
@@ -1401,19 +1401,19 @@ astFieldsLoop:
 				return
 			}
 		} else if !isBasicGoType(typeAsString) {
-			fieldSchemaSchemaObjectID, err := p.registerType(pkgPath, pkgName, typeAsString)
+			fieldSchemaSchemeaObjectID, err := p.registerType(pkgPath, pkgName, typeAsString)
 			if err != nil {
 				p.debug("parseSchemaPropertiesFromStructFields err:", err)
 			} else {
-				fieldSchema.ID = fieldSchemaSchemaObjectID
-				schema, ok := p.KnownIDSchema[fieldSchemaSchemaObjectID]
+				fieldSchema.ID = fieldSchemaSchemeaObjectID
+				schema, ok := p.KnownIDSchema[fieldSchemaSchemeaObjectID]
 				if ok {
 					fieldSchema.Type = schema.Type
 					if schema.Items != nil {
 						fieldSchema.Items = schema.Items
 					}
 				}
-				fieldSchema.Ref = addSchemaRefLinkPrefix(fieldSchemaSchemaObjectID)
+				fieldSchema.Ref = addSchemaRefLinkPrefix(fieldSchemaSchemeaObjectID)
 			}
 		} else if isGoTypeOASType(typeAsString) {
 			fieldSchema.Type = goTypesOASTypes[typeAsString]
