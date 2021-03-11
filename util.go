@@ -151,7 +151,7 @@ func trimeSchemaRefLinkPrefix(ref string) string {
 	return strings.TrimPrefix(ref, "#/components/schemas/")
 }
 
-func genSchemeaObjectID(pkgName, typeName string) string {
+func genSchemaObjectID(pkgName, typeName string) string {
 	typeNameParts := strings.Split(typeName, ".")
 	return typeNameParts[len(typeNameParts)-1]
 }
