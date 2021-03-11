@@ -31,11 +31,11 @@ func TestExample(t *testing.T) {
             },
             "FooResponse": {
                 "properties": {
-					"count": {
+                    "count": {
                         "type": "integer"
                     },
                     "endDate": {
-                        "type": "integer"
+                        "$ref": "#/components/schemas/UnixMillis"
                     },
                     "environments": {
                         "additionalProperties": {
@@ -85,7 +85,10 @@ func TestExample(t *testing.T) {
                     }
                 },
                 "type": "object"
-            }
+            },
+						"UnixMillis": {
+						    "type": "integer"
+						}
         },
         "securitySchemes": {
             "ApiKey": {
