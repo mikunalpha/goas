@@ -1148,7 +1148,7 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 		pkgPath, pkgName = guessPkgPath, guessPkgName
 	}
 
-	if isGoTypeOASType(p.getTypeAsString(typeSpec.Type)) {
+	if isGoTypeOASType(p.getTypeAsString(typeSpec.Type)) && schemaObject.Ref == "" {
 		schemaObject.Type = goTypesOASTypes[p.getTypeAsString(typeSpec.Type)]
 	} else if astIdent, ok := typeSpec.Type.(*ast.Ident); ok {
 		_ = astIdent
@@ -1260,12 +1260,8 @@ astFieldsLoop:
 				p.debug("parseSchemaPropertiesFromStructFields err:", err)
 			} else {
 				fieldSchema.ID = fieldSchemaSchemaObjectID
-				schema, ok := p.KnownIDSchema[fieldSchemaSchemaObjectID]
+				_, ok := p.KnownIDSchema[fieldSchemaSchemaObjectID]
 				if ok {
-					fieldSchema.Type = schema.Type
-					if schema.Items != nil {
-						fieldSchema.Items = schema.Items
-					}
 					fieldSchema.Ref = addSchemaRefLinkPrefix(fieldSchemaSchemaObjectID)
 				} else {
 					fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
