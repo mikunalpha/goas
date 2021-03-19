@@ -1,4 +1,4 @@
-module github.com/mikunalpha/goas
+module frontiercargroup.org/dealer/goas
 
 go 1.12
 
