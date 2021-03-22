@@ -1229,22 +1229,19 @@ func (p *parser) parseSchemaPropertiesFromStructFields(pkgPath, pkgName string, 
 	if astFields == nil {
 		return
 	}
-	var err error
 	structSchema.Properties = orderedmap.New()
 	if structSchema.DisabledFieldNames == nil {
 		structSchema.DisabledFieldNames = map[string]struct{}{}
 	}
-astFieldsLoop:
+
 	for _, astField := range astFields {
-		if len(astField.Names) == 0 {
-			continue
-		}
 		fieldSchema := &SchemaObject{}
 		typeAsString := p.getTypeAsString(astField.Type)
 		typeAsString = strings.TrimLeft(typeAsString, "*")
 		isSliceOrMap := strings.HasPrefix(typeAsString, "[]") || strings.HasPrefix(typeAsString, "map[]")
 		isInterface := strings.HasPrefix(typeAsString, "interface{}")
 		if isSliceOrMap || isInterface || typeAsString == "time.Time" {
+			var err error
 			fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
 			if err != nil {
 				p.debug(err)
@@ -1270,135 +1267,7 @@ astFieldsLoop:
 		} else if isGoTypeOASType(typeAsString) {
 			fieldSchema.Type = goTypesOASTypes[typeAsString]
 		}
-
-		name := astField.Names[0].Name
-		fieldSchema.FieldName = name
-		_, disabled := structSchema.DisabledFieldNames[name]
-		if disabled {
-			continue
-		}
-
-		if astField.Tag != nil {
-			astFieldTag := reflect.StructTag(strings.Trim(astField.Tag.Value, "`"))
-			tagText := ""
-
-			if tag := astFieldTag.Get("goas"); tag != "" {
-				tagText = tag
-			}
-			tagValues := strings.Split(tagText, ",")
-			for _, v := range tagValues {
-				if v == "-" {
-					structSchema.DisabledFieldNames[name] = struct{}{}
-					fieldSchema.Deprecated = true
-					continue astFieldsLoop
-				}
-			}
-
-			if tag := astFieldTag.Get("json"); tag != "" {
-				tagText = tag
-			}
-			tagValues = strings.Split(tagText, ",")
-			isRequired := false
-			for _, v := range tagValues {
-				if v == "-" {
-					structSchema.DisabledFieldNames[name] = struct{}{}
-					fieldSchema.Deprecated = true
-					continue astFieldsLoop
-				} else if v == "required" {
-					isRequired = true
-				} else if v != "" && v != "required" && v != "omitempty" {
-					name = v
-				}
-			}
-
-			if tag := astFieldTag.Get("example"); tag != "" {
-				switch fieldSchema.Type {
-				case "boolean":
-					fieldSchema.Example, _ = strconv.ParseBool(tag)
-				case "integer":
-					fieldSchema.Example, _ = strconv.Atoi(tag)
-				case "number":
-					fieldSchema.Example, _ = strconv.ParseFloat(tag, 64)
-				case "array":
-					b, err := json.RawMessage(tag).MarshalJSON()
-					if err != nil {
-						fieldSchema.Example = "invalid example"
-					} else {
-						sliceOfInterface := []interface{}{}
-						err := json.Unmarshal(b, &sliceOfInterface)
-						if err != nil {
-							fieldSchema.Example = "invalid example"
-						} else {
-							fieldSchema.Example = sliceOfInterface
-						}
-					}
-				case "object":
-					b, err := json.RawMessage(tag).MarshalJSON()
-					if err != nil {
-						fieldSchema.Example = "invalid example"
-					} else {
-						mapOfInterface := map[string]interface{}{}
-						err := json.Unmarshal(b, &mapOfInterface)
-						if err != nil {
-							fieldSchema.Example = "invalid example"
-						} else {
-							fieldSchema.Example = mapOfInterface
-						}
-					}
-				default:
-					fieldSchema.Example = tag
-				}
-
-				if fieldSchema.Example != nil && len(fieldSchema.Ref) != 0 {
-					fieldSchema.Ref = ""
-				}
-			}
-
-			if _, ok := astFieldTag.Lookup("required"); ok || isRequired {
-				structSchema.Required = append(structSchema.Required, name)
-			}
-
-			if desc := astFieldTag.Get("description"); desc != "" {
-				fieldSchema.Description = desc
-			}
-		}
-
-		structSchema.Properties.Set(name, fieldSchema)
-	}
-	for _, astField := range astFields {
-		if len(astField.Names) > 0 {
-			continue
-		}
-		fieldSchema := &SchemaObject{}
-		typeAsString := p.getTypeAsString(astField.Type)
-		typeAsString = strings.TrimLeft(typeAsString, "*")
-		isSliceOrMap := strings.HasPrefix(typeAsString, "[]") || strings.HasPrefix(typeAsString, "map[]")
-		isInterface := strings.HasPrefix(typeAsString, "interface{}")
-		if isSliceOrMap || isInterface || typeAsString == "time.Time" {
-			fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
-			if err != nil {
-				p.debug(err)
-				return
-			}
-		} else if !isBasicGoType(typeAsString) {
-			fieldSchemaSchemeaObjectID, err := p.registerType(pkgPath, pkgName, typeAsString)
-			if err != nil {
-				p.debug("parseSchemaPropertiesFromStructFields err:", err)
-			} else {
-				fieldSchema.ID = fieldSchemaSchemeaObjectID
-				schema, ok := p.KnownIDSchema[fieldSchemaSchemeaObjectID]
-				if ok {
-					fieldSchema.Type = schema.Type
-					if schema.Items != nil {
-						fieldSchema.Items = schema.Items
-					}
-				}
-				fieldSchema.Ref = addSchemaRefLinkPrefix(fieldSchemaSchemeaObjectID)
-			}
-		} else if isGoTypeOASType(typeAsString) {
-			fieldSchema.Type = goTypesOASTypes[typeAsString]
-		}
-		// embedded type
+		// for embedded fields
 		if len(astField.Names) == 0 {
 			if fieldSchema.Properties != nil {
 				for _, propertyName := range fieldSchema.Properties.Keys() {
@@ -1431,7 +1300,22 @@ astFieldsLoop:
 					}
 				}
 			}
-			continue
+		} else {
+			name := astField.Names[0].Name
+			fieldSchema.FieldName = name
+			_, disabled := structSchema.DisabledFieldNames[name]
+			if disabled {
+				continue
+			}
+
+			newName, skip := parseStructTags(astField, structSchema, fieldSchema, name)
+			if skip {
+				continue
+			}
+
+			name = newName
+
+			structSchema.Properties.Set(name, fieldSchema)
 		}
 	}
 }
@@ -1465,6 +1349,95 @@ func (p *parser) getTypeAsString(fieldType interface{}) string {
 	}
 
 	return fmt.Sprint(fieldType)
+}
+
+func parseStructTags(astField *ast.Field, structSchema *SchemaObject, fieldSchema *SchemaObject, name string) (newName string, skip bool) {
+	if astField.Tag != nil {
+		astFieldTag := reflect.StructTag(strings.Trim(astField.Tag.Value, "`"))
+		tagText := ""
+
+		if tag := astFieldTag.Get("goas"); tag != "" {
+			tagText = tag
+		}
+		tagValues := strings.Split(tagText, ",")
+		for _, v := range tagValues {
+			if v == "-" {
+				structSchema.DisabledFieldNames[name] = struct{}{}
+				fieldSchema.Deprecated = true
+				return "", true
+			}
+		}
+
+		if tag := astFieldTag.Get("json"); tag != "" {
+			tagText = tag
+		}
+		tagValues = strings.Split(tagText, ",")
+		isRequired := false
+		for _, v := range tagValues {
+			if v == "-" {
+				structSchema.DisabledFieldNames[name] = struct{}{}
+				fieldSchema.Deprecated = true
+				return "", true
+			} else if v == "required" {
+				isRequired = true
+			} else if v != "" && v != "required" && v != "omitempty" {
+				name = v
+			}
+		}
+
+		if tag := astFieldTag.Get("example"); tag != "" {
+			switch fieldSchema.Type {
+			case "boolean":
+				fieldSchema.Example, _ = strconv.ParseBool(tag)
+			case "integer":
+				fieldSchema.Example, _ = strconv.Atoi(tag)
+			case "number":
+				fieldSchema.Example, _ = strconv.ParseFloat(tag, 64)
+			case "array":
+				b, err := json.RawMessage(tag).MarshalJSON()
+				if err != nil {
+					fieldSchema.Example = "invalid example"
+				} else {
+					sliceOfInterface := []interface{}{}
+					err := json.Unmarshal(b, &sliceOfInterface)
+					if err != nil {
+						fieldSchema.Example = "invalid example"
+					} else {
+						fieldSchema.Example = sliceOfInterface
+					}
+				}
+			case "object":
+				b, err := json.RawMessage(tag).MarshalJSON()
+				if err != nil {
+					fieldSchema.Example = "invalid example"
+				} else {
+					mapOfInterface := map[string]interface{}{}
+					err := json.Unmarshal(b, &mapOfInterface)
+					if err != nil {
+						fieldSchema.Example = "invalid example"
+					} else {
+						fieldSchema.Example = mapOfInterface
+					}
+				}
+			default:
+				fieldSchema.Example = tag
+			}
+
+			if fieldSchema.Example != nil && len(fieldSchema.Ref) != 0 {
+				fieldSchema.Ref = ""
+			}
+		}
+
+		if _, ok := astFieldTag.Lookup("required"); ok || isRequired {
+			structSchema.Required = append(structSchema.Required, name)
+		}
+
+		if desc := astFieldTag.Get("description"); desc != "" {
+			fieldSchema.Description = desc
+		}
+	}
+
+	return name, false
 }
 
 func (p *parser) debug(v ...interface{}) {
