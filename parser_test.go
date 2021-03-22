@@ -62,9 +62,15 @@ func TestExample(t *testing.T) {
                         },
                         "type": "array"
                     },
+										"freeForm": {
+										    "type": "object"
+										},
                     "id": {
                         "type": "string"
                     },
+										"jsonMap": {
+										    "$ref": "#/components/schemas/JsonMap"
+										},
                     "msg": {
                         "type": "object"
                     },
@@ -86,6 +92,12 @@ func TestExample(t *testing.T) {
                 },
                 "type": "object"
             },
+						"JsonMap": {
+						    "additionalProperties": {
+								    "type": "object"
+								},
+								"type": "object"
+						},
 						"UnixMillis": {
 						    "type": "integer"
 						}

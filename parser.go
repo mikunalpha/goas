@@ -1006,25 +1006,33 @@ func (p *parser) parseRouteComment(operation *OperationObject, comment string) e
 	return nil
 }
 
+func (p *parser) getSchemaObjectCached(pkgPath, pkgName, typeName string) (*SchemaObject, error) {
+	var schemaObject *SchemaObject
+
+	// see if we've already parsed this type
+	if knownObj, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, typeName)]; ok {
+		schemaObject = knownObj
+	} else {
+		// if not, parse it now
+		parsedObject, err := p.parseSchemaObject(pkgPath, pkgName, typeName)
+		if err != nil {
+			return schemaObject, err
+		}
+		schemaObject = parsedObject
+	}
+
+	return schemaObject, nil
+}
+
 func (p *parser) registerType(pkgPath, pkgName, typeName string) (string, error) {
 	var registerTypeName string
 
 	if isBasicGoType(typeName) {
 		registerTypeName = typeName
 	} else {
-
-		var schemaObject *SchemaObject
-
-		// see if we've already parsed this type
-		if knownObj, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, typeName)]; ok {
-			schemaObject = knownObj
-		} else {
-			// if not, parse it now
-			parsedObject, err := p.parseSchemaObject(pkgPath, pkgName, typeName)
-			if err != nil {
-				return "", err
-			}
-			schemaObject = parsedObject
+		schemaObject, err := p.getSchemaObjectCached(pkgPath, pkgName, typeName)
+		if err != nil {
+			return "", err
 		}
 		registerTypeName = schemaObject.ID
 	}
@@ -1070,6 +1078,7 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 		schemaObject.Format = "date-time"
 		return &schemaObject, nil
 	} else if strings.HasPrefix(typeName, "interface{}") {
+		schemaObject.Type = "object"
 		return &schemaObject, nil
 	} else if isGoTypeOASType(typeName) {
 		schemaObject.Type = goTypesOASTypes[typeName]
@@ -1162,29 +1171,37 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 		schemaObject.Items = &SchemaObject{}
 		typeAsString := p.getTypeAsString(astArrayType.Elt)
 		typeAsString = strings.TrimLeft(typeAsString, "*")
+
 		if !isBasicGoType(typeAsString) {
-			schemaItemsSchemeaObjectID, err := p.registerType(pkgPath, pkgName, typeAsString)
+			itemsSchema, err := p.getSchemaObjectCached(pkgPath, pkgName, typeAsString)
 			if err != nil {
 				p.debug("parseSchemaObject parse array items err:", err)
 			} else {
-				schemaObject.Items.Ref = addSchemaRefLinkPrefix(schemaItemsSchemeaObjectID)
+				if itemsSchema.ID != "" {
+					schemaObject.Items.Ref = addSchemaRefLinkPrefix(itemsSchema.ID)
+				} else {
+					*schemaObject.Items = *itemsSchema
+				}
 			}
 		} else if isGoTypeOASType(typeAsString) {
 			schemaObject.Items.Type = goTypesOASTypes[typeAsString]
 		}
 	} else if astMapType, ok := typeSpec.Type.(*ast.MapType); ok {
 		schemaObject.Type = "object"
-		schemaObject.Properties = orderedmap.New()
 		propertySchema := &SchemaObject{}
-		schemaObject.Properties.Set("key", propertySchema)
+		schemaObject.AdditionalProperties = propertySchema
 		typeAsString := p.getTypeAsString(astMapType.Value)
 		typeAsString = strings.TrimLeft(typeAsString, "*")
 		if !isBasicGoType(typeAsString) {
-			schemaItemsSchemeaObjectID, err := p.registerType(pkgPath, pkgName, typeAsString)
+			keySchema, err := p.getSchemaObjectCached(pkgPath, pkgName, typeAsString)
 			if err != nil {
 				p.debug("parseSchemaObject parse array items err:", err)
 			} else {
-				propertySchema.Ref = addSchemaRefLinkPrefix(schemaItemsSchemeaObjectID)
+				if keySchema.ID != "" {
+					propertySchema.Ref = addSchemaRefLinkPrefix(keySchema.ID)
+				} else {
+					*propertySchema = *keySchema
+				}
 			}
 		} else if isGoTypeOASType(typeAsString) {
 			propertySchema.Type = goTypesOASTypes[typeAsString]
