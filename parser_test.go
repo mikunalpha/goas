@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,39 +18,145 @@ func TestExample(t *testing.T) {
 	bts, err := json.MarshalIndent(p.OpenAPI, "", "    ")
 	require.NoError(t, err)
 
+	fmt.Println(string(bts))
+
 	expected := `
 {
+    "openapi": "3.0.0",
+    "info": {
+        "title": "LaunchDarkly REST API",
+        "description": "Build custom integrations with the LaunchDarkly REST API",
+        "contact": {
+            "name": "LaunchDarkly Technical Support Team",
+            "url": "https://support.launchdarkly.com",
+            "email": "support@launchdarkly.com"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        },
+        "version": "2.0"
+    },
+    "servers": [
+        {
+            "url": "https://app.launchdarkly.com"
+        }
+    ],
+    "paths": {
+        "/api/v2/foo": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "Successful foo response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FooResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid access token"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "description": "Invalid resource identifier"
+                    }
+                },
+                "summary": "Get all foos",
+                "description": " Get all foos"
+            },
+            "put": {
+                "responses": {
+                    "200": {
+                        "description": "Successful foo response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FooResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid access token"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "description": "Invalid resource identifier"
+                    }
+                },
+                "summary": "Put foo",
+                "description": " Overwrite a foo"
+            }
+        },
+        "/api/v2/foo/{id}/inner": {
+            "put": {
+                "responses": {
+                    "200": {
+                        "description": "Successful innerfoo response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InnerFoo"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid access token"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "description": "Invalid resource identifier"
+                    }
+                },
+                "summary": "Get inner foos",
+                "description": " Get Inner Foos"
+            }
+        }
+    },
     "components": {
         "schemas": {
+            "DoubleAlias": {},
             "Environment": {
+                "type": "object",
                 "properties": {
                     "name": {
                         "type": "string"
                     }
-                },
-                "type": "object"
+                }
             },
             "FooResponse": {
+                "type": "object",
                 "properties": {
-                    "count": {
-                        "type": "integer"
+                    "id": {
+                        "type": "string"
+                    },
+                    "startDate": {
+                        "type": "string",
+                        "format": "date-time"
                     },
                     "endDate": {
                         "$ref": "#/components/schemas/UnixMillis"
                     },
-                    "environments": {
-                        "additionalProperties": {
-                            "properties": {
-                                "name": {
-                                    "type": "string"
-                                }
-                            },
-                            "type": "object"
-                        },
+                    "count": {
+                        "type": "integer"
+                    },
+                    "msg": {
                         "type": "object"
                     },
                     "foo": {
+                        "type": "array",
                         "items": {
+                            "type": "object",
                             "properties": {
                                 "a": {
                                     "type": "string"
@@ -57,31 +164,33 @@ func TestExample(t *testing.T) {
                                 "b": {
                                     "type": "string"
                                 }
-                            },
-                            "type": "object"
-                        },
-                        "type": "array"
+                            }
+                        }
                     },
-										"freeForm": {
-										    "type": "object"
-										},
-                    "id": {
-                        "type": "string"
+                    "environments": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                }
+                            }
+                        }
                     },
-										"jsonMap": {
-										    "$ref": "#/components/schemas/JsonMap"
-										},
-                    "msg": {
+                    "freeForm": {
                         "type": "object"
                     },
-                    "startDate": {
-                        "format": "date-time",
-                        "type": "string"
+                    "jsonMap": {
+                        "$ref": "#/components/schemas/JsonMap"
+                    },
+                    "doubleAlias": {
+                        "$ref": "#/components/schemas/DoubleAlias"
                     }
-                },
-                "type": "object"
+                }
             },
             "InnerFoo": {
+                "type": "object",
                 "properties": {
                     "a": {
                         "type": "string"
@@ -89,120 +198,23 @@ func TestExample(t *testing.T) {
                     "b": {
                         "type": "string"
                     }
-                },
-                "type": "object"
+                }
             },
-						"JsonMap": {
-						    "additionalProperties": {
-								    "type": "object"
-								},
-								"type": "object"
-						},
-						"UnixMillis": {
-						    "type": "integer"
-						}
+            "JsonMap": {
+                "type": "object",
+                "additionalProperties": {
+                    "type": "object"
+                }
+            },
+            "UnixMillis": {
+                "type": "integer"
+            }
         },
         "securitySchemes": {
             "ApiKey": {
+                "type": "apiKey",
                 "in": "header",
-                "name": "Authorization",
-                "type": "apiKey"
-            }
-        }
-    },
-    "info": {
-        "contact": {
-            "email": "support@launchdarkly.com",
-            "name": "LaunchDarkly Technical Support Team",
-            "url": "https://support.launchdarkly.com"
-        },
-        "description": "Build custom integrations with the LaunchDarkly REST API",
-        "license": {
-            "name": "Apache 2.0",
-            "url": "https://www.apache.org/licenses/LICENSE-2.0"
-        },
-        "title": "LaunchDarkly REST API",
-        "version": "2.0"
-    },
-    "openapi": "3.0.0",
-    "paths": {
-        "/api/v2/foo": {
-            "get": {
-                "description": " Get all foos",
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/FooResponse"
-                                }
-                            }
-                        },
-                        "description": "Successful foo response"
-                    },
-                    "401": {
-                        "description": "Invalid access token"
-                    },
-                    "403": {
-                        "description": "Forbidden"
-                    },
-                    "404": {
-                        "description": "Invalid resource identifier"
-                    }
-                },
-                "summary": "Get all foos"
-            },
-            "put": {
-                "description": " Overwrite a foo",
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/FooResponse"
-                                }
-                            }
-                        },
-                        "description": "Successful foo response"
-                    },
-                    "401": {
-                        "description": "Invalid access token"
-                    },
-                    "403": {
-                        "description": "Forbidden"
-                    },
-                    "404": {
-                        "description": "Invalid resource identifier"
-                    }
-                },
-                "summary": "Put foo"
-            }
-        },
-        "/api/v2/foo/{id}/inner": {
-            "put": {
-                "description": " Get Inner Foos",
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/InnerFoo"
-                                }
-                            }
-                        },
-                        "description": "Successful innerfoo response"
-                    },
-                    "401": {
-                        "description": "Invalid access token"
-                    },
-                    "403": {
-                        "description": "Forbidden"
-                    },
-                    "404": {
-                        "description": "Invalid resource identifier"
-                    }
-                },
-                "summary": "Get inner foos"
+                "name": "Authorization"
             }
         }
     },
@@ -212,11 +224,6 @@ func TestExample(t *testing.T) {
                 "read",
                 "write"
             ]
-        }
-    ],
-    "servers": [
-        {
-            "url": "https://app.launchdarkly.com"
         }
     ]
 }
