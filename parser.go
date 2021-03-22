@@ -1372,25 +1372,9 @@ astFieldsLoop:
 		fieldSchema := &SchemaObject{}
 		typeAsString := p.getTypeAsString(astField.Type)
 		typeAsString = strings.TrimLeft(typeAsString, "*")
-		if strings.HasPrefix(typeAsString, "[]") {
-			fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
-			if err != nil {
-				p.debug(err)
-				return
-			}
-		} else if strings.HasPrefix(typeAsString, "map[]") {
-			fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
-			if err != nil {
-				p.debug(err)
-				return
-			}
-		} else if typeAsString == "time.Time" {
-			fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
-			if err != nil {
-				p.debug(err)
-				return
-			}
-		} else if strings.HasPrefix(typeAsString, "interface{}") {
+		isSliceOrMap := strings.HasPrefix(typeAsString, "[]") || strings.HasPrefix(typeAsString, "map[]")
+		isInterface := strings.HasPrefix(typeAsString, "interface{}")
+		if isSliceOrMap || isInterface || typeAsString == "time.Time" {
 			fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
 			if err != nil {
 				p.debug(err)
@@ -1438,7 +1422,6 @@ astFieldsLoop:
 						if disabled {
 							continue
 						}
-						// p.debug(">", propertyName)
 						_, exist := structSchema.Properties.Get(propertyName)
 						if exist {
 							continue
