@@ -129,7 +129,7 @@ func TestExample(t *testing.T) {
                 "additionalProperties": {
                     "type": "object"
                 }
-			},
+            },
             "Environment": {
                 "type": "object",
                 "properties": {
