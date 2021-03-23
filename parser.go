@@ -1208,6 +1208,11 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 		} else if isGoTypeOASType(typeAsString) {
 			propertySchema.Type = goTypesOASTypes[typeAsString]
 		}
+	} else if _, ok := typeSpec.Type.(*ast.InterfaceType); ok {
+		// type points to an interface, the most we can do is give it an object type..
+		schemaObject.Type = "object"
+		// free form object since the interface can be "anything"
+		schemaObject.AdditionalProperties = &SchemaObject{}
 	}
 
 	// register schema object in spec tree if it doesn't exist
