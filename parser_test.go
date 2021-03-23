@@ -191,6 +191,9 @@ func TestExample(t *testing.T) {
                     },
                     "doubleAlias": {
                         "$ref": "#/components/schemas/DoubleAlias"
+                    },
+                    "interfaceBlah": {
+                        "$ref": "#/components/schemas/InterfaceResponse"
                     }
                 }
             },
@@ -204,6 +207,10 @@ func TestExample(t *testing.T) {
                         "type": "string"
                     }
                 }
+            },
+            "InterfaceResponse": {
+                "type": "object",
+                "additionalProperties": {}
             },
             "JsonMap": {
                 "type": "object",
