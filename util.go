@@ -141,6 +141,9 @@ var goTypesOASFormats = map[string]string{
 // var modelNamesPackageNames = map[string]string{}
 
 func addSchemaRefLinkPrefix(name string) string {
+	if name == "" {
+		log.Fatalln("schema does not reference valid name")
+	}
 	if strings.HasPrefix(name, "#/components/schemas/") {
 		return replaceBackslash(name)
 	}
