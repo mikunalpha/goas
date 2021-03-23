@@ -1160,6 +1160,7 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 		if err != nil {
 			return nil, err
 		}
+		schemaObject.Type = newSchema.Type
 		schemaObject.Properties = newSchema.Properties
 		schemaObject.AdditionalProperties = newSchema.AdditionalProperties
 	} else if astStructType, ok := typeSpec.Type.(*ast.StructType); ok {
