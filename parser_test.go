@@ -125,7 +125,11 @@ func TestExample(t *testing.T) {
     },
     "components": {
         "schemas": {
-            "DoubleAlias": {},
+            "DoubleAlias": {
+                "additionalProperties": {
+                    "type": "object"
+                }
+			},
             "Environment": {
                 "type": "object",
                 "properties": {

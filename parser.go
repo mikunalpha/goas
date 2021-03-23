@@ -1155,7 +1155,13 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 	if isGoTypeOASType(p.getTypeAsString(typeSpec.Type)) && schemaObject.Ref == "" {
 		schemaObject.Type = goTypesOASTypes[p.getTypeAsString(typeSpec.Type)]
 	} else if astIdent, ok := typeSpec.Type.(*ast.Ident); ok {
-		_ = astIdent
+		// this is for type aliases to custom types
+		newSchema, err := p.parseSchemaObject(pkgPath, pkgName, astIdent.Name)
+		if err != nil {
+			return nil, err
+		}
+		schemaObject.Properties = newSchema.Properties
+		schemaObject.AdditionalProperties = newSchema.AdditionalProperties
 	} else if astStructType, ok := typeSpec.Type.(*ast.StructType); ok {
 		schemaObject.Type = "object"
 		if astStructType.Fields != nil {
