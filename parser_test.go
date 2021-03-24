@@ -125,6 +125,9 @@ func TestExample(t *testing.T) {
     },
     "components": {
         "schemas": {
+            "BsonID": {
+                "type": "string"
+            },
             "DoubleAlias": {
                 "type": "object",
                 "additionalProperties": {
@@ -142,6 +145,9 @@ func TestExample(t *testing.T) {
             "FooResponse": {
                 "type": "object",
                 "properties": {
+                    "bsonId": {
+                        "$ref": "#/components/schemas/BsonID"
+                    },
                     "id": {
                         "type": "string"
                     },
@@ -194,6 +200,9 @@ func TestExample(t *testing.T) {
                     },
                     "interfaceBlah": {
                         "$ref": "#/components/schemas/InterfaceResponse"
+                    },
+                    "instruction": {
+                        "$ref": "#/components/schemas/Instruction"
                     }
                 }
             },
@@ -206,6 +215,12 @@ func TestExample(t *testing.T) {
                     "b": {
                         "type": "string"
                     }
+                }
+            },
+            "Instruction": {
+                "type": "object",
+                "additionalProperties": {
+                    "type": "object"
                 }
             },
             "InterfaceResponse": {
@@ -245,7 +260,7 @@ func TestExample(t *testing.T) {
 
 func TestDeterministic(t *testing.T) {
 	var allOutputs []string
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 10; i++ {
 		p, err := newParser("example/", "example/main.go", "", false)
 		require.NoError(t, err)
 

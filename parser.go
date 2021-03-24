@@ -157,7 +157,7 @@ func newParser(modulePath, mainFilePath, handlerPath string, debug bool) (*parse
 	goModCacheInfo, err := os.Stat(goModCachePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, err
+			return nil, fmt.Errorf("could not find goModCachePath: %w", err)
 		}
 		return nil, fmt.Errorf("cannot get information of %s: %s", goModCachePath, err)
 	}
@@ -835,7 +835,7 @@ func (p *parser) parseParamComment(pkgPath, pkgName string, operation *Operation
 		}
 		if goType == "time.Time" {
 			var err error
-			parameterObject.Schema, err = p.parseSchemaObject(pkgPath, pkgName, goType)
+			parameterObject.Schema, err = p.parseSchemaObject(pkgPath, pkgName, goType, true)
 			if err != nil {
 				p.debug("parseResponseComment cannot parse goType", goType)
 			}
@@ -859,7 +859,7 @@ func (p *parser) parseParamComment(pkgPath, pkgName string, operation *Operation
 	}
 
 	if strings.HasPrefix(goType, "[]") || strings.HasPrefix(goType, "map[]") || goType == "time.Time" {
-		schema, err := p.parseSchemaObject(pkgPath, pkgName, goType)
+		schema, err := p.parseSchemaObject(pkgPath, pkgName, goType, true)
 		if err != nil {
 			p.debug("parseResponseComment cannot parse goType", goType)
 		}
@@ -932,7 +932,7 @@ func (p *parser) parseResponseComment(pkgPath, pkgName string, operation *Operat
 		re = regexp.MustCompile(`\[\w*\]`)
 		goType := re.ReplaceAllString(goTypeRaw, "[]")
 		if strings.HasPrefix(goType, "[]") || strings.HasPrefix(goType, "map[]") {
-			schema, err := p.parseSchemaObject(pkgPath, pkgName, goType)
+			schema, err := p.parseSchemaObject(pkgPath, pkgName, goType, true)
 			if err != nil {
 				p.debug("parseResponseComment: cannot parse goType", goType)
 			}
@@ -1009,7 +1009,7 @@ func (p *parser) getSchemaObjectCached(pkgPath, pkgName, typeName string) (*Sche
 		schemaObject = knownObj
 	} else {
 		// if not, parse it now
-		parsedObject, err := p.parseSchemaObject(pkgPath, pkgName, typeName)
+		parsedObject, err := p.parseSchemaObject(pkgPath, pkgName, typeName, true)
 		if err != nil {
 			return schemaObject, err
 		}
@@ -1034,7 +1034,7 @@ func (p *parser) registerType(pkgPath, pkgName, typeName string) (string, error)
 	return registerTypeName, nil
 }
 
-func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaObject, error) {
+func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string, register bool) (*SchemaObject, error) {
 	var typeSpec *ast.TypeSpec
 	var exist bool
 	var schemaObject SchemaObject
@@ -1049,7 +1049,7 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 			schemaObject.Items = &SchemaObject{Ref: addSchemaRefLinkPrefix(schema.ID)}
 			return &schemaObject, nil
 		}
-		schemaObject.Items, err = p.parseSchemaObject(pkgPath, pkgName, itemTypeName)
+		schemaObject.Items, err = p.parseSchemaObject(pkgPath, pkgName, itemTypeName, true)
 		if err != nil {
 			return nil, err
 		}
@@ -1062,7 +1062,7 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 			schemaObject.AdditionalProperties = &SchemaObject{Ref: addSchemaRefLinkPrefix(schema.ID)}
 			return &schemaObject, nil
 		}
-		schemaProperty, err := p.parseSchemaObject(pkgPath, pkgName, itemTypeName)
+		schemaProperty, err := p.parseSchemaObject(pkgPath, pkgName, itemTypeName, true)
 		if err != nil {
 			return nil, err
 		}
@@ -1156,7 +1156,7 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 		schemaObject.Type = goTypesOASTypes[p.getTypeAsString(typeSpec.Type)]
 	} else if astIdent, ok := typeSpec.Type.(*ast.Ident); ok {
 		// this is for type aliases to custom types
-		newSchema, err := p.parseSchemaObject(pkgPath, pkgName, astIdent.Name)
+		newSchema, err := p.parseSchemaObject(pkgPath, pkgName, astIdent.Name, true)
 		if err != nil {
 			return nil, err
 		}
@@ -1208,6 +1208,31 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 		} else if isGoTypeOASType(typeAsString) {
 			propertySchema.Type = goTypesOASTypes[typeAsString]
 		}
+	} else if selectorType, ok := typeSpec.Type.(*ast.SelectorExpr); ok {
+		// this case is for referencing third party packages.
+		packageIdentifier, ok := selectorType.X.(*ast.Ident)
+		usedTypeName := selectorType.Sel.Name
+		if ok {
+			packageName := packageIdentifier.Name
+			for potentialPackage, typeSpecs := range p.TypeSpecs {
+				if strings.HasSuffix(potentialPackage, packageName) {
+					// iterate through types of that package
+					for name, _ := range typeSpecs {
+						if name == usedTypeName {
+							parsedPackageSchema, err := p.parseSchemaObject(potentialPackage, potentialPackage, usedTypeName, false)
+							if err != nil {
+								return nil, err
+							}
+							schemaObject.Type = parsedPackageSchema.Type
+							schemaObject.Properties = parsedPackageSchema.Properties
+							schemaObject.AdditionalProperties = parsedPackageSchema.AdditionalProperties
+							break
+						}
+					}
+				}
+			}
+
+		}
 	} else if _, ok := typeSpec.Type.(*ast.InterfaceType); ok {
 		// type points to an interface, the most we can do is give it an object type..
 		schemaObject.Type = "object"
@@ -1215,11 +1240,14 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string) (*SchemaOb
 		schemaObject.AdditionalProperties = &SchemaObject{}
 	}
 
-	// register schema object in spec tree if it doesn't exist
-	registerTypeName := schemaObject.ID
-	_, ok := p.OpenAPI.Components.Schemas[replaceBackslash(registerTypeName)]
-	if !ok {
-		p.OpenAPI.Components.Schemas[replaceBackslash(registerTypeName)] = &schemaObject
+	// we don't want to register 3rd party library types
+	if register {
+		// register schema object in spec tree if it doesn't exist
+		registerTypeName := schemaObject.ID
+		_, ok := p.OpenAPI.Components.Schemas[replaceBackslash(registerTypeName)]
+		if !ok {
+			p.OpenAPI.Components.Schemas[replaceBackslash(registerTypeName)] = &schemaObject
+		}
 	}
 
 	return &schemaObject, nil
@@ -1254,7 +1282,7 @@ func (p *parser) parseSchemaPropertiesFromStructFields(pkgPath, pkgName string, 
 		isInterface := strings.HasPrefix(typeAsString, "interface{}")
 		if isSliceOrMap || isInterface || typeAsString == "time.Time" {
 			var err error
-			fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
+			fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString, true)
 			if err != nil {
 				p.debug(err)
 				return
@@ -1269,7 +1297,7 @@ func (p *parser) parseSchemaPropertiesFromStructFields(pkgPath, pkgName string, 
 				if ok {
 					fieldSchema.Ref = addSchemaRefLinkPrefix(fieldSchemaSchemeaObjectID)
 				} else {
-					fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString)
+					fieldSchema, err = p.parseSchemaObject(pkgPath, pkgName, typeAsString, true)
 					if err != nil {
 						p.debug(err)
 						return

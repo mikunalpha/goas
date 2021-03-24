@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"gopkg.in/mgo.v2/bson"
 	"time"
 )
 
@@ -10,8 +11,11 @@ type JsonMap map[string]interface{}
 type DoubleAlias JsonMap
 
 type InterfaceResponse interface{}
+type Instruction bson.M
+type BsonID bson.ObjectId
 
 type FooResponse struct {
+	BsonID        BsonID                 `json:"bsonId"`
 	ID            string                 `json:"id"`
 	StartDate     time.Time              `json:"startDate"`
 	EndDate       UnixMillis             `json:"endDate"`
@@ -23,6 +27,7 @@ type FooResponse struct {
 	JsonMap       JsonMap                `json:"jsonMap"`
 	DoubleAlias   DoubleAlias            `json:"doubleAlias"`
 	InterfaceBlah InterfaceResponse      `json:"interfaceBlah"`
+	Instruction   Instruction            `json:"instruction"`
 }
 
 type Environment struct {
