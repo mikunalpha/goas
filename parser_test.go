@@ -225,7 +225,9 @@ func TestExample(t *testing.T) {
             },
             "InterfaceResponse": {
                 "type": "object",
-                "additionalProperties": {}
+                "additionalProperties": {
+                    "type": "object"
+                }
             },
             "JsonMap": {
                 "type": "object",

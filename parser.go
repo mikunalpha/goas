@@ -1237,7 +1237,9 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string, register b
 		// type points to an interface, the most we can do is give it an object type..
 		schemaObject.Type = "object"
 		// free form object since the interface can be "anything"
-		schemaObject.AdditionalProperties = &SchemaObject{}
+		schemaObject.AdditionalProperties = &SchemaObject{
+			Type: "object",
+		}
 	}
 
 	// we don't want to register 3rd party library types
