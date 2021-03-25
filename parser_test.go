@@ -203,6 +203,10 @@ func TestExample(t *testing.T) {
                     },
                     "instruction": {
                         "$ref": "#/components/schemas/Instruction"
+                    },
+                    "bsonPtr": {
+                        "example": "blah blah blah",
+                        "$ref": "#/components/schemas/BsonID"
                     }
                 }
             },

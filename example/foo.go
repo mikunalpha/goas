@@ -28,6 +28,7 @@ type FooResponse struct {
 	DoubleAlias   DoubleAlias            `json:"doubleAlias"`
 	InterfaceBlah InterfaceResponse      `json:"interfaceBlah"`
 	Instruction   Instruction            `json:"instruction"`
+	BsonPtr       *BsonID                `json:"bsonPtr,omitempty" example:"blah blah blah"`
 }
 
 type Environment struct {

@@ -1464,10 +1464,6 @@ func parseStructTags(astField *ast.Field, structSchema *SchemaObject, fieldSchem
 			default:
 				fieldSchema.Example = tag
 			}
-
-			if fieldSchema.Example != nil && len(fieldSchema.Ref) != 0 {
-				fieldSchema.Ref = ""
-			}
 		}
 
 		if _, ok := astFieldTag.Lookup("required"); ok || isRequired {
