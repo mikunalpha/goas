@@ -1,7 +1,7 @@
 package main
 
 import (
-	"frontiercargroup.org/dealer/goas/parser"
+	"github.com/parvez3019/goas/parser"
 	"github.com/urfave/cli"
 	"log"
 )

@@ -1,4 +1,4 @@
-module frontiercargroup.org/dealer/goas
+module github.com/parvez3019/goas
 
 go 1.12
 
