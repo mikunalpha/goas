@@ -1,4 +1,4 @@
-module github.com/parvez3019/goas
+module github.com/mikunalpha/goas
 
 go 1.12
 

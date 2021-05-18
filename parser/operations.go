@@ -3,7 +3,7 @@ package parser
 import (
 	"fmt"
 	"github.com/iancoleman/orderedmap"
-	. "github.com/parvez3019/goas/openApi3Schema"
+	. "github.com/mikunalpha/goas/openApi3Schema"
 	"go/ast"
 	"net/http"
 	"regexp"

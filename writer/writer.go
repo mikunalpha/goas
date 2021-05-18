@@ -3,7 +3,7 @@ package writer
 import (
 	"encoding/json"
 	"fmt"
-	. "github.com/parvez3019/goas/openApi3Schema"
+	. "github.com/mikunalpha/goas/openApi3Schema"
 	log "github.com/sirupsen/logrus"
 	"os"
 )

@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/parvez3019/goas/parser"
-	"github.com/parvez3019/goas/writer"
+	"github.com/mikunalpha/goas/parser"
+	"github.com/mikunalpha/goas/writer"
 	"github.com/urfave/cli"
 	"log"
 )

@@ -32,7 +32,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/github.com.parvez3019.goas.model.GetRestaurantsResponse"
+                  "$ref": "#/components/schemas/github.com.mikunalpha.goas.model.GetRestaurantsResponse"
                 }
               }
             }
@@ -83,8 +83,8 @@
             "in": "query",
             "description": "In json format",
             "schema": {
-              "type": "github.com.parvez3019.goas.model.Filter",
-              "$ref": "#/components/schemas/github.com.parvez3019.goas.model.Filter"
+              "type": "github.com.mikunalpha.goas.model.Filter",
+              "$ref": "#/components/schemas/github.com.mikunalpha.goas.model.Filter"
             }
           }
         ]
@@ -120,7 +120,7 @@
           "highest-rated"
         ]
       },
-      "github.com.parvez3019.goas.model.Filter": {
+      "github.com.mikunalpha.goas.model.Filter": {
         "type": "object",
         "properties": {
           "rating": {
@@ -137,7 +137,7 @@
           }
         }
       },
-      "github.com.parvez3019.goas.model.GetRestaurantsResponse": {
+      "github.com.mikunalpha.goas.model.GetRestaurantsResponse": {
         "type": "object",
         "properties": {
           "restaurants": {

@@ -2,7 +2,7 @@ package parser
 
 import (
 	"fmt"
-	. "github.com/parvez3019/goas/openApi3Schema"
+	. "github.com/mikunalpha/goas/openApi3Schema"
 	"go/ast"
 	"go/token"
 	"strings"
