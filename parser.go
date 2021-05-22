@@ -1150,6 +1150,16 @@ astFieldsLoop:
 					fieldSchema.Deprecated = true
 					continue astFieldsLoop
 				}
+				if kv := strings.Split(v, "="); len(kv) == 2 {
+					switch kv[0] {
+					case "type":
+						fieldSchema.Type = kv[1]
+						fieldSchema.Ref = ""
+
+					case "format":
+						fieldSchema.Format = kv[1]
+					}
+				}
 			}
 
 			if tag := astFieldTag.Get("json"); tag != "" {
