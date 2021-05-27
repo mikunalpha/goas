@@ -1158,6 +1158,9 @@ astFieldsLoop:
 
 					case "format":
 						fieldSchema.Format = kv[1]
+
+					case "nullable":
+						fieldSchema.Nullable, _ = strconv.ParseBool(kv[1])
 					}
 				}
 			}
