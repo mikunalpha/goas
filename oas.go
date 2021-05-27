@@ -144,7 +144,7 @@ type SchemaObject struct {
 	Items       *SchemaObject          `json:"items,omitempty"` // use ptr to prevent recursive error
 	Example     interface{}            `json:"example,omitempty"`
 	Deprecated  bool                   `json:"deprecated,omitempty"`
-	Nullable bool `json:"nullable,omitempty"`
+	Nullable    bool                   `json:"nullable,omitempty"`
 
 	// Ref is used when SchemaObject is as a ReferenceObject
 	Ref string `json:"$ref,omitempty"`
