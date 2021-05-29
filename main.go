@@ -1,13 +1,14 @@
 package main
 
 import (
+	"github.com/mikunalpha/goas/parser"
+	"github.com/mikunalpha/goas/writer"
+	"github.com/urfave/cli"
 	"log"
 	"os"
-
-	"github.com/urfave/cli"
 )
 
-var version = "v1.0.0"
+var version = "v1.7.0"
 
 var flags = []cli.Flag{
 	cli.StringFlag{
@@ -34,15 +35,35 @@ var flags = []cli.Flag{
 		Name:  "debug",
 		Usage: "show debug message",
 	},
+	cli.BoolFlag{
+		Name:  "strict",
+		Usage: "convert go parsing warnings to fatal errors",
+	},
+	cli.BoolFlag{
+		Name:  "schema-without-pkg",
+		Usage: "create schemas without package name append to the name",
+	},
 }
 
 func action(c *cli.Context) error {
-	p, err := newParser(c.GlobalString("module-path"), c.GlobalString("main-file-path"), c.GlobalString("handler-path"), c.GlobalBool("debug"))
+	p, err := parser.NewParser(
+		c.GlobalString("module-path"),
+		c.GlobalString("main-file-path"),
+		c.GlobalString("handler-path"),
+		c.GlobalBool("debug"),
+		c.GlobalBool("strict"),
+		c.GlobalBool("schema-without-pkg"),
+		)
 	if err != nil {
 		return err
 	}
-	// fmt.Printf("%+v\n", p)
-	return p.CreateOASFile(c.GlobalString("output"))
+	openApiObject, err := p.Parse()
+	if err != nil {
+		return err
+	}
+
+	fw := writer.NewFileWriter()
+	return fw.Write(openApiObject, c.GlobalString("output"))
 }
 
 func main() {

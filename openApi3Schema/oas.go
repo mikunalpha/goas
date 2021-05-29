@@ -1,4 +1,4 @@
-package main
+package openApi3Schema
 
 import "github.com/iancoleman/orderedmap"
 
@@ -16,7 +16,7 @@ type OpenAPIObject struct {
 	Servers []ServerObject `json:"servers,omitempty"`
 	Paths   PathsObject    `json:"paths"` // Required
 
-	Components ComponentsOjbect      `json:"components,omitempty"` // Required for Authorization header
+	Components ComponentsObject      `json:"components,omitempty"` // Required for Authorization header
 	Security   []map[string][]string `json:"security,omitempty"`
 
 	// Tags
@@ -88,9 +88,8 @@ type OperationObject struct {
 }
 
 type ParameterObject struct {
-	Name string `json:"name"` // Required
-	In   string `json:"in"`   // Required. Possible values are "query", "header", "path" or "cookie"
-
+	Name        string        `json:"name,omitempty"` // Required
+	In          string        `json:"in,omitempty"`   // Required. Possible values are "query", "header", "path" or "cookie"
 	Description string        `json:"description,omitempty"`
 	Required    bool          `json:"required,omitempty"`
 	Example     interface{}   `json:"example,omitempty"`
@@ -106,10 +105,6 @@ type ParameterObject struct {
 	// AllowReserved
 	// Examples
 	// Content
-}
-
-type ReferenceObject struct {
-	Ref string `json:"$ref,omitempty"`
 }
 
 type RequestBodyObject struct {
@@ -131,22 +126,20 @@ type MediaTypeObject struct {
 }
 
 type SchemaObject struct {
-	ID                 string              `json:"-"` // For goas
-	PkgName            string              `json:"-"` // For goas
-	FieldName          string              `json:"-"` // For goas
-	DisabledFieldNames map[string]struct{} `json:"-"` // For goas
-
-	Type        string                 `json:"type,omitempty"`
-	Format      string                 `json:"format,omitempty"`
-	Required    []string               `json:"required,omitempty"`
-	Properties  *orderedmap.OrderedMap `json:"properties,omitempty"`
-	Description string                 `json:"description,omitempty"`
-	Items       *SchemaObject          `json:"items,omitempty"` // use ptr to prevent recursive error
-	Example     interface{}            `json:"example,omitempty"`
-	Deprecated  bool                   `json:"deprecated,omitempty"`
-
-	// Ref is used when SchemaObject is as a ReferenceObject
-	Ref string `json:"$ref,omitempty"`
+	ID                 string                 `json:"-"` // For goas
+	PkgName            string                 `json:"-"` // For goas
+	FieldName          string                 `json:"-"` // For goas
+	DisabledFieldNames map[string]struct{}    `json:"-"` // For goas
+	Type               string                 `json:"type,omitempty"`
+	Format             string                 `json:"format,omitempty"`
+	Required           []string               `json:"required,omitempty"`
+	Properties         *orderedmap.OrderedMap `json:"properties,omitempty"`
+	Description        string                 `json:"description,omitempty"`
+	Items              *SchemaObject          `json:"items,omitempty"` // use ptr to prevent recursive error
+	Example            interface{}            `json:"example,omitempty"`
+	Deprecated         bool                   `json:"deprecated,omitempty"`
+	Ref                string                 `json:"$ref,omitempty"` // Ref is used when SchemaObject is as a ReferenceObject
+	Enum               interface{}            `json:"enum,omitempty"`
 
 	// Title
 	// MultipleOf
@@ -162,7 +155,6 @@ type SchemaObject struct {
 	// UniqueItems
 	// MaxProperties
 	// MinProperties
-	// Enum
 	// AllOf
 	// OneOf
 	// AnyOf
@@ -199,12 +191,11 @@ type HeaderObject struct {
 	Ref string `json:"$ref,omitempty"`
 }
 
-type ComponentsOjbect struct {
+type ComponentsObject struct {
 	Schemas         map[string]*SchemaObject         `json:"schemas,omitempty"`
 	SecuritySchemes map[string]*SecuritySchemeObject `json:"securitySchemes,omitempty"`
-
+	Parameters      map[string]*ParameterObject      `json:"parameters,omitempty"`
 	// Responses
-	// Parameters
 	// Examples
 	// RequestBodies
 	// Headers

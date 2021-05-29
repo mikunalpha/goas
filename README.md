@@ -80,7 +80,7 @@ For OAuth2 security schemes, it is possible to define scopes using the `@Securit
 
 By adding comments to your handler func godoc, you can document individual actions as well as their input and output.
 
-```go
+``` go
 type User struct {
   ID   uint64 `json:"id" example:"100" description:"User identity"`
   Name string `json:"name" example:"Mikun"` 
@@ -92,15 +92,23 @@ type UsersResponse struct {
 
 type Error struct {
   Code string `json:"code"`
-  Msg  string `json:"msg"`
+  Msg  string `json:"msg" skip:"true"`
+  // use skip:"true" if you want to skip the field in the documentation spec
 }
 
 type ErrorResponse struct {
   ErrorInfo Error `json:"error"`
 }
 
+// RequestHeaders represents the model for header params
+// @HeaderParameters RequestHeaders
+type RequestHeaders struct {
+    Authorization  string  `json:"Authorization"`
+}
+
 // @Title Get user list of a group.
 // @Description Get users related to a specific group.
+// @Header model.RequestHeaders
 // @Param  groupID  path  int  true  "Id of a specific group."
 // @Success  200  object  UsersResponse  "UsersResponse JSON"
 // @Failure  400  object  ErrorResponse  "ErrorResponse JSON"
@@ -144,6 +152,31 @@ func PostUser() {
 - {required}: `true`, `false`, `required` or `optional`. 
 - {description}: The description of the parameter. Must be quoted.
 
+One can also override example for an object with `override-example` key in struct
+eg -
+```go
+type Request struct {
+    version  model.Version `"json:"Version" override-example:"11.0.0"`
+}
+```
+
+#### Header 
+```
+@Header          {goType}
+@HeaderParameters   model.RequestHeaders
+```
+- Header query param for endpoints, parses the query param from the model
+
+
+#### HeaderParameters
+```
+@Param              {goType}
+@HeaderParameters   RequestHeaders
+```
+
+- {goType}: The type in go code. This will be ignored when {in} is `file`.
+- Parses parameters from the type and keep it up component section for reference
+
 #### Response
 ```
 @Success  {stauts}  {jsonType}  {goType}       {description}
@@ -165,15 +198,42 @@ func PostUser() {
 @Tag {tag}
 @tag xxx
 ```
+
 - {resource}, {tag}: Tag of the route.
 
 #### Route
+
 ```
 @Route {path}    {method}
 @Route /api/user [post]
 ```
+
 - {path}: The URL path.
 - {method}: The HTTP Method. Must be put in brackets.
+
+#### Enums
+
+- To generate enums create type structs for enum field with comma-separated values as follows:
+- Create struct type fields with @Enum Tag
+- Example as follows-
+
+``` go
+// @Enum CountriesEnum
+type CountriesEnum struct {
+    // Create the field name with same as struct name
+    CountriesEnum string `enum:"india,china,mexico,japan" example:"india"`
+}
+```
+
+##### How to add reference of Enum on types
+
+``` go
+type Request struct {
+  Name string `json:"name" example:"Parvez"` 
+  Country string `json:"country" $ref:"CountriesEnum"`
+}
+
+```
 
 ### Documentation Generation
 
