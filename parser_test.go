@@ -159,7 +159,8 @@ func TestExample(t *testing.T) {
                         "$ref": "#/components/schemas/UnixMillis"
                     },
                     "count": {
-                        "type": "integer"
+                        "type": "integer",
+                        "format": "int64"
                     },
                     "msg": {
                         "type": "object"
@@ -240,7 +241,8 @@ func TestExample(t *testing.T) {
                 }
             },
             "UnixMillis": {
-                "type": "integer"
+                "type": "integer",
+                "format": "int64"
             }
         },
         "securitySchemes": {

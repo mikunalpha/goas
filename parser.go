@@ -1153,7 +1153,10 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string, register b
 	}
 
 	if isGoTypeOASType(p.getTypeAsString(typeSpec.Type)) && schemaObject.Ref == "" {
-		schemaObject.Type = goTypesOASTypes[p.getTypeAsString(typeSpec.Type)]
+		typeAsString := p.getTypeAsString(typeSpec.Type)
+		schemaObject.Type = goTypesOASTypes[typeAsString]
+		checkFormatInt64(typeAsString, &schemaObject)
+
 	} else if astIdent, ok := typeSpec.Type.(*ast.Ident); ok {
 		// this is for type aliases to custom types
 		newSchema, err := p.parseSchemaObject(pkgPath, pkgName, astIdent.Name, true)
@@ -1308,6 +1311,7 @@ func (p *parser) parseSchemaPropertiesFromStructFields(pkgPath, pkgName string, 
 			}
 		} else if isGoTypeOASType(typeAsString) {
 			fieldSchema.Type = goTypesOASTypes[typeAsString]
+			checkFormatInt64(typeAsString, fieldSchema)
 		}
 		// for embedded fields
 		if len(astField.Names) == 0 {
