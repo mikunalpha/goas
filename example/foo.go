@@ -2,8 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"gopkg.in/mgo.v2/bson"
 	"time"
+
+	"gopkg.in/mgo.v2/bson"
 )
 
 type UnixMillis int64
@@ -19,7 +20,7 @@ type FooResponse struct {
 	ID            string                 `json:"id"`
 	StartDate     time.Time              `json:"startDate"`
 	EndDate       UnixMillis             `json:"endDate"`
-	Count         int64                  `json:"count"`
+	Count         int64                  `json:"count" example:"6"`
 	Msg           json.RawMessage        `json:"msg"`
 	InnerFoos     []InnerFoo             `json:"foo"`
 	Environments  map[string]Environment `json:"environments"`
@@ -29,6 +30,7 @@ type FooResponse struct {
 	InterfaceBlah InterfaceResponse      `json:"interfaceBlah"`
 	Instruction   Instruction            `json:"instruction"`
 	BsonPtr       *BsonID                `json:"bsonPtr,omitempty" example:"blah blah blah"`
+	RandomBool    bool                   `json:"randomBool,omitempty" example:"true"`
 }
 
 type Environment struct {

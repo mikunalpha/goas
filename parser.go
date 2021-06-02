@@ -57,6 +57,12 @@ type pkg struct {
 	Path string
 }
 
+var (
+	objectType = "object"
+	stringType = "string"
+	arrayType  = "array"
+)
+
 func newParser(modulePath, mainFilePath, handlerPath string, debug bool) (*parser, error) {
 	p := &parser{
 		CorePkgs:                map[string]bool{},
@@ -789,7 +795,7 @@ func (p *parser) parseParamComment(pkgPath, pkgName string, operation *Operation
 				Content: map[string]*MediaTypeObject{
 					ContentTypeForm: &MediaTypeObject{
 						Schema: SchemaObject{
-							Type:       "object",
+							Type:       &objectType,
 							Properties: orderedmap.New(),
 						},
 					},
@@ -799,22 +805,23 @@ func (p *parser) parseParamComment(pkgPath, pkgName string, operation *Operation
 		}
 		if in == "file" {
 			operation.RequestBody.Content[ContentTypeForm].Schema.Properties.Set(name, &SchemaObject{
-				Type:        "string",
+				Type:        &stringType,
 				Format:      "binary",
 				Description: description,
 			})
 		} else if in == "files" {
 			operation.RequestBody.Content[ContentTypeForm].Schema.Properties.Set(name, &SchemaObject{
-				Type: "array",
+				Type: &arrayType,
 				Items: &SchemaObject{
-					Type:   "string",
+					Type:   &stringType,
 					Format: "binary",
 				},
 				Description: description,
 			})
 		} else if isGoTypeOASType(goType) {
+			localGoType := goTypesOASTypes[goType]
 			operation.RequestBody.Content[ContentTypeForm].Schema.Properties.Set(name, &SchemaObject{
-				Type:        goTypesOASTypes[goType],
+				Type:        &localGoType,
 				Format:      goTypesOASFormats[goType],
 				Description: description,
 			})
@@ -841,8 +848,9 @@ func (p *parser) parseParamComment(pkgPath, pkgName string, operation *Operation
 			}
 			operation.Parameters = append(operation.Parameters, parameterObject)
 		} else if isGoTypeOASType(goType) {
+			localGoType := goTypesOASTypes[goType]
 			parameterObject.Schema = &SchemaObject{
-				Type:        goTypesOASTypes[goType],
+				Type:        &localGoType,
 				Format:      goTypesOASFormats[goType],
 				Description: description,
 			}
@@ -874,7 +882,7 @@ func (p *parser) parseParamComment(pkgPath, pkgName string, operation *Operation
 		if isBasicGoType(typeName) {
 			operation.RequestBody.Content[ContentTypeJson] = &MediaTypeObject{
 				Schema: SchemaObject{
-					Type: "string",
+					Type: &stringType,
 				},
 			}
 		} else {
@@ -947,7 +955,7 @@ func (p *parser) parseResponseComment(pkgPath, pkgName string, operation *Operat
 			if isBasicGoType(typeName) {
 				responseObject.Content[ContentTypeText] = &MediaTypeObject{
 					Schema: SchemaObject{
-						Type: "string",
+						Type: &stringType,
 					},
 				}
 			} else {
@@ -1042,7 +1050,7 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string, register b
 
 	// handler basic and some specific typeName
 	if strings.HasPrefix(typeName, "[]") {
-		schemaObject.Type = "array"
+		schemaObject.Type = &arrayType
 		itemTypeName := typeName[2:]
 		schema, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, itemTypeName)]
 		if ok {
@@ -1055,7 +1063,7 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string, register b
 		}
 		return &schemaObject, nil
 	} else if strings.HasPrefix(typeName, "map[]") {
-		schemaObject.Type = "object"
+		schemaObject.Type = &objectType
 		itemTypeName := typeName[5:]
 		schema, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, itemTypeName)]
 		if ok {
@@ -1069,14 +1077,15 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string, register b
 		schemaObject.AdditionalProperties = schemaProperty
 		return &schemaObject, nil
 	} else if typeName == "time.Time" {
-		schemaObject.Type = "string"
+		schemaObject.Type = &stringType
 		schemaObject.Format = "date-time"
 		return &schemaObject, nil
 	} else if strings.HasPrefix(typeName, "interface{}") {
-		schemaObject.Type = "object"
+		schemaObject.Type = nil
 		return &schemaObject, nil
 	} else if isGoTypeOASType(typeName) {
-		schemaObject.Type = goTypesOASTypes[typeName]
+		localGoType := goTypesOASTypes[typeName]
+		schemaObject.Type = &localGoType
 		return &schemaObject, nil
 	}
 
@@ -1137,7 +1146,7 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string, register b
 			if !exist {
 				if p.CorePkgs[guessPkgName] == true {
 					p.debugf("Ignoring missing type %s in core package %s", guessTypeName, guessPkgName)
-					schemaObject.Type = "object"
+					schemaObject.Type = &objectType
 					return &schemaObject, nil
 				}
 
@@ -1154,7 +1163,8 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string, register b
 
 	if isGoTypeOASType(p.getTypeAsString(typeSpec.Type)) && schemaObject.Ref == "" {
 		typeAsString := p.getTypeAsString(typeSpec.Type)
-		schemaObject.Type = goTypesOASTypes[typeAsString]
+		localGoType := goTypesOASTypes[typeAsString]
+		schemaObject.Type = &localGoType
 		checkFormatInt64(typeAsString, &schemaObject)
 
 	} else if astIdent, ok := typeSpec.Type.(*ast.Ident); ok {
@@ -1167,12 +1177,12 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string, register b
 		schemaObject.Properties = newSchema.Properties
 		schemaObject.AdditionalProperties = newSchema.AdditionalProperties
 	} else if astStructType, ok := typeSpec.Type.(*ast.StructType); ok {
-		schemaObject.Type = "object"
+		schemaObject.Type = &objectType
 		if astStructType.Fields != nil {
 			p.parseSchemaPropertiesFromStructFields(pkgPath, pkgName, &schemaObject, astStructType.Fields.List)
 		}
 	} else if astArrayType, ok := typeSpec.Type.(*ast.ArrayType); ok {
-		schemaObject.Type = "array"
+		schemaObject.Type = &arrayType
 		schemaObject.Items = &SchemaObject{}
 		typeAsString := p.getTypeAsString(astArrayType.Elt)
 		typeAsString = strings.TrimLeft(typeAsString, "*")
@@ -1189,10 +1199,11 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string, register b
 				}
 			}
 		} else if isGoTypeOASType(typeAsString) {
-			schemaObject.Items.Type = goTypesOASTypes[typeAsString]
+			localGoType := goTypesOASTypes[typeAsString]
+			schemaObject.Items.Type = &localGoType
 		}
 	} else if astMapType, ok := typeSpec.Type.(*ast.MapType); ok {
-		schemaObject.Type = "object"
+		schemaObject.Type = &objectType
 		propertySchema := &SchemaObject{}
 		schemaObject.AdditionalProperties = propertySchema
 		typeAsString := p.getTypeAsString(astMapType.Value)
@@ -1209,7 +1220,8 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string, register b
 				}
 			}
 		} else if isGoTypeOASType(typeAsString) {
-			propertySchema.Type = goTypesOASTypes[typeAsString]
+			localGoType := goTypesOASTypes[typeAsString]
+			propertySchema.Type = &localGoType
 		}
 	} else if selectorType, ok := typeSpec.Type.(*ast.SelectorExpr); ok {
 		// this case is for referencing third party packages.
@@ -1238,10 +1250,10 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string, register b
 		}
 	} else if _, ok := typeSpec.Type.(*ast.InterfaceType); ok {
 		// type points to an interface, the most we can do is give it an object type..
-		schemaObject.Type = "object"
+		schemaObject.Type = &objectType
 		// free form object since the interface can be "anything"
 		schemaObject.AdditionalProperties = &SchemaObject{
-			Type: "object",
+			Type: &objectType,
 		}
 	}
 
@@ -1310,7 +1322,8 @@ func (p *parser) parseSchemaPropertiesFromStructFields(pkgPath, pkgName string, 
 				}
 			}
 		} else if isGoTypeOASType(typeAsString) {
-			fieldSchema.Type = goTypesOASTypes[typeAsString]
+			localGoType := goTypesOASTypes[typeAsString]
+			fieldSchema.Type = &localGoType
 			checkFormatInt64(typeAsString, fieldSchema)
 		}
 		// for embedded fields
@@ -1432,41 +1445,45 @@ func parseStructTags(astField *ast.Field, structSchema *SchemaObject, fieldSchem
 		}
 
 		if tag := astFieldTag.Get("example"); tag != "" {
-			switch fieldSchema.Type {
-			case "boolean":
-				fieldSchema.Example, _ = strconv.ParseBool(tag)
-			case "integer":
-				fieldSchema.Example, _ = strconv.Atoi(tag)
-			case "number":
-				fieldSchema.Example, _ = strconv.ParseFloat(tag, 64)
-			case "array":
-				b, err := json.RawMessage(tag).MarshalJSON()
-				if err != nil {
-					fieldSchema.Example = "invalid example"
-				} else {
-					sliceOfInterface := []interface{}{}
-					err := json.Unmarshal(b, &sliceOfInterface)
-					if err != nil {
-						fieldSchema.Example = "invalid example"
-					} else {
-						fieldSchema.Example = sliceOfInterface
-					}
-				}
-			case "object":
-				b, err := json.RawMessage(tag).MarshalJSON()
-				if err != nil {
-					fieldSchema.Example = "invalid example"
-				} else {
-					mapOfInterface := map[string]interface{}{}
-					err := json.Unmarshal(b, &mapOfInterface)
-					if err != nil {
-						fieldSchema.Example = "invalid example"
-					} else {
-						fieldSchema.Example = mapOfInterface
-					}
-				}
-			default:
+			if fieldSchema.Type == nil {
 				fieldSchema.Example = tag
+			} else {
+				switch *fieldSchema.Type {
+				case "boolean":
+					fieldSchema.Example, _ = strconv.ParseBool(tag)
+				case "integer":
+					fieldSchema.Example, _ = strconv.Atoi(tag)
+				case "number":
+					fieldSchema.Example, _ = strconv.ParseFloat(tag, 64)
+				case "array":
+					b, err := json.RawMessage(tag).MarshalJSON()
+					if err != nil {
+						fieldSchema.Example = "invalid example"
+					} else {
+						sliceOfInterface := []interface{}{}
+						err := json.Unmarshal(b, &sliceOfInterface)
+						if err != nil {
+							fieldSchema.Example = "invalid example"
+						} else {
+							fieldSchema.Example = sliceOfInterface
+						}
+					}
+				case "object":
+					b, err := json.RawMessage(tag).MarshalJSON()
+					if err != nil {
+						fieldSchema.Example = "invalid example"
+					} else {
+						mapOfInterface := map[string]interface{}{}
+						err := json.Unmarshal(b, &mapOfInterface)
+						if err != nil {
+							fieldSchema.Example = "invalid example"
+						} else {
+							fieldSchema.Example = mapOfInterface
+						}
+					}
+				default:
+					fieldSchema.Example = tag
+				}
 			}
 		}
 

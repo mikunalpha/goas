@@ -136,7 +136,7 @@ type SchemaObject struct {
 	FieldName          string              `json:"-"` // For goas
 	DisabledFieldNames map[string]struct{} `json:"-"` // For goas
 
-	Type                 string                 `json:"type,omitempty"`
+	Type                 *string                `json:"type,omitempty"`
 	Format               string                 `json:"format,omitempty"`
 	Required             []string               `json:"required,omitempty"`
 	Properties           *orderedmap.OrderedMap `json:"properties,omitempty"`

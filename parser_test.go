@@ -130,9 +130,7 @@ func TestExample(t *testing.T) {
             },
             "DoubleAlias": {
                 "type": "object",
-                "additionalProperties": {
-                    "type": "object"
-                }
+                "additionalProperties": {}
             },
             "Environment": {
                 "type": "object",
@@ -160,7 +158,8 @@ func TestExample(t *testing.T) {
                     },
                     "count": {
                         "type": "integer",
-                        "format": "int64"
+                        "format": "int64",
+                        "example": 6
                     },
                     "msg": {
                         "type": "object"
@@ -190,9 +189,7 @@ func TestExample(t *testing.T) {
                             }
                         }
                     },
-                    "freeForm": {
-                        "type": "object"
-                    },
+                    "freeForm": {},
                     "jsonMap": {
                         "$ref": "#/components/schemas/JsonMap"
                     },
@@ -208,6 +205,10 @@ func TestExample(t *testing.T) {
                     "bsonPtr": {
                         "example": "blah blah blah",
                         "$ref": "#/components/schemas/BsonID"
+                    },
+                    "randomBool": {
+                        "example": true,
+                        "type": "boolean"
                     }
                 }
             },
@@ -224,9 +225,7 @@ func TestExample(t *testing.T) {
             },
             "Instruction": {
                 "type": "object",
-                "additionalProperties": {
-                    "type": "object"
-                }
+                "additionalProperties": {}
             },
             "InterfaceResponse": {
                 "type": "object",
@@ -236,9 +235,7 @@ func TestExample(t *testing.T) {
             },
             "JsonMap": {
                 "type": "object",
-                "additionalProperties": {
-                    "type": "object"
-                }
+                "additionalProperties": {}
             },
             "UnixMillis": {
                 "type": "integer",
