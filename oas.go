@@ -77,7 +77,7 @@ type OperationObject struct {
 	Description string             `json:"description,omitempty"`
 	Parameters  []ParameterObject  `json:"parameters,omitempty"`
 	RequestBody *RequestBodyObject `json:"requestBody,omitempty"`
-
+	OperationID string             `json:"operationId,omitempty"`
 	// Tags
 	// ExternalDocs
 	// OperationID

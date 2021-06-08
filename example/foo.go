@@ -39,6 +39,7 @@ type Environment struct {
 
 // @Title Get all foos
 // @Description Get all foos
+// @OperationId getAllFoos
 // @Route /api/v2/foo [get]
 // @Success 200 object FooResponse "Successful foo response"
 // @Failure 401 "Invalid access token"

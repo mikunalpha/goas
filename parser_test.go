@@ -67,7 +67,8 @@ func TestExample(t *testing.T) {
                     }
                 },
                 "summary": "Get all foos",
-                "description": " Get all foos"
+                "description": " Get all foos",
+                "operationId": "getAllFoos"
             },
             "put": {
                 "responses": {

@@ -744,6 +744,8 @@ func (p *parser) parseOperation(pkgPath, pkgName string, astComments []*ast.Comm
 			operation.Summary = strings.TrimSpace(comment[len(attribute):])
 		case "@description":
 			operation.Description = strings.Join([]string{operation.Description, strings.TrimSpace(comment[len(attribute):])}, " ")
+		case "@operationid":
+			operation.OperationID = strings.TrimSpace(comment[len(attribute):])
 		case "@param":
 			err = p.parseParamComment(pkgPath, pkgName, operation, strings.TrimSpace(comment[len(attribute):]))
 		case "@success", "@failure":
