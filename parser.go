@@ -1017,6 +1017,8 @@ func (p *parser) getSchemaObjectCached(pkgPath, pkgName, typeName string) (*Sche
 	// see if we've already parsed this type
 	if knownObj, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, typeName)]; ok {
 		schemaObject = knownObj
+	} else if foundType, ok := p.KnownIDSchema[typeName]; ok {
+		schemaObject = foundType
 	} else {
 		// if not, parse it now
 		parsedObject, err := p.parseSchemaObject(pkgPath, pkgName, typeName, true)
@@ -1251,12 +1253,8 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string, register b
 
 		}
 	} else if _, ok := typeSpec.Type.(*ast.InterfaceType); ok {
-		// type points to an interface, the most we can do is give it an object type..
-		schemaObject.Type = &objectType
 		// free form object since the interface can be "anything"
-		schemaObject.AdditionalProperties = &SchemaObject{
-			Type: &objectType,
-		}
+		schemaObject.Type = nil
 	}
 
 	// we don't want to register 3rd party library types

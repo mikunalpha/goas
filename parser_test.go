@@ -51,7 +51,7 @@ func TestExample(t *testing.T) {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/FooResponse"
+                                    "$ref": "#/components/schemas/example.FooResponse"
                                 }
                             }
                         }
@@ -77,7 +77,7 @@ func TestExample(t *testing.T) {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/FooResponse"
+                                    "$ref": "#/components/schemas/example.FooResponse"
                                 }
                             }
                         }
@@ -104,7 +104,7 @@ func TestExample(t *testing.T) {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/InnerFoo"
+                                    "$ref": "#/components/schemas/example.InnerFoo"
                                 }
                             }
                         }
@@ -126,14 +126,14 @@ func TestExample(t *testing.T) {
     },
     "components": {
         "schemas": {
-            "BsonID": {
+            "example.BsonID": {
                 "type": "string"
             },
-            "DoubleAlias": {
+            "example.DoubleAlias": {
                 "type": "object",
                 "additionalProperties": {}
             },
-            "Environment": {
+            "example.Environment": {
                 "type": "object",
                 "properties": {
                     "name": {
@@ -141,11 +141,11 @@ func TestExample(t *testing.T) {
                     }
                 }
             },
-            "FooResponse": {
+            "example.FooResponse": {
                 "type": "object",
                 "properties": {
                     "bsonId": {
-                        "$ref": "#/components/schemas/BsonID"
+                        "$ref": "#/components/schemas/example.BsonID"
                     },
                     "id": {
                         "type": "string"
@@ -155,7 +155,7 @@ func TestExample(t *testing.T) {
                         "format": "date-time"
                     },
                     "endDate": {
-                        "$ref": "#/components/schemas/UnixMillis"
+                        "$ref": "#/components/schemas/example.UnixMillis"
                     },
                     "count": {
                         "type": "integer",
@@ -192,20 +192,20 @@ func TestExample(t *testing.T) {
                     },
                     "freeForm": {},
                     "jsonMap": {
-                        "$ref": "#/components/schemas/JsonMap"
+                        "$ref": "#/components/schemas/example.JsonMap"
                     },
                     "doubleAlias": {
-                        "$ref": "#/components/schemas/DoubleAlias"
+                        "$ref": "#/components/schemas/example.DoubleAlias"
                     },
                     "interfaceBlah": {
-                        "$ref": "#/components/schemas/InterfaceResponse"
+                        "$ref": "#/components/schemas/example.InterfaceResponse"
                     },
                     "instruction": {
-                        "$ref": "#/components/schemas/Instruction"
+                        "$ref": "#/components/schemas/example.Instruction"
                     },
                     "bsonPtr": {
                         "example": "blah blah blah",
-                        "$ref": "#/components/schemas/BsonID"
+                        "$ref": "#/components/schemas/example.BsonID"
                     },
                     "randomBool": {
                         "example": true,
@@ -213,7 +213,7 @@ func TestExample(t *testing.T) {
                     }
                 }
             },
-            "InnerFoo": {
+            "example.InnerFoo": {
                 "type": "object",
                 "properties": {
                     "a": {
@@ -224,21 +224,16 @@ func TestExample(t *testing.T) {
                     }
                 }
             },
-            "Instruction": {
+            "example.Instruction": {
                 "type": "object",
                 "additionalProperties": {}
             },
-            "InterfaceResponse": {
-                "type": "object",
-                "additionalProperties": {
-                    "type": "object"
-                }
-            },
-            "JsonMap": {
+            "example.InterfaceResponse": {},
+            "example.JsonMap": {
                 "type": "object",
                 "additionalProperties": {}
             },
-            "UnixMillis": {
+            "example.UnixMillis": {
                 "type": "integer",
                 "format": "int64"
             }
