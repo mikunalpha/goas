@@ -693,6 +693,13 @@ func (p *parser) parsePaths() error {
 								return err
 							}
 						}
+					} else if astVarDeclaration, ok := astDeclaration.(*ast.GenDecl); ok {
+						if astVarDeclaration.Doc != nil && astVarDeclaration.Doc.List != nil {
+							err = p.parseOperation(pkgPath, pkgName, astVarDeclaration.Doc.List)
+							if err != nil {
+								return err
+							}
+						}
 					}
 				}
 			}
@@ -751,7 +758,7 @@ func (p *parser) parseOperation(pkgPath, pkgName string, astComments []*ast.Comm
 		case "@success", "@failure":
 			err = p.parseResponseComment(pkgPath, pkgName, operation, strings.TrimSpace(comment[len(attribute):]))
 		case "@resource", "@tag":
-			resource := strings.TrimSpace(comment[len(attribute):])
+			resource := strings.ToLower(strings.TrimSpace(comment[len(attribute):]))
 			if resource == "" {
 				resource = "others"
 			}

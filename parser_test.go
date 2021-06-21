@@ -68,7 +68,10 @@ func TestExample(t *testing.T) {
                 },
                 "summary": "Get all foos",
                 "description": " Get all foos",
-                "operationId": "getAllFoos"
+                "operationId": "getAllFoos",
+                "tags": [
+                    "foo"
+                ]
             },
             "put": {
                 "responses": {
@@ -121,6 +124,36 @@ func TestExample(t *testing.T) {
                 },
                 "summary": "Get inner foos",
                 "description": " Get Inner Foos"
+            }
+        },
+        "/api/v2/vfoo": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "Successful foo response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/example.FooResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid access token"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "description": "Invalid resource identifier"
+                    }
+                },
+                "summary": "Get Foo as var",
+                "description": " get a foo var",
+                "tags": [
+                    "vfoo"
+                ]
             }
         }
     },

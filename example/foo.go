@@ -38,6 +38,7 @@ type Environment struct {
 }
 
 // @Title Get all foos
+// @Tag Foo
 // @Description Get all foos
 // @OperationId getAllFoos
 // @Route /api/v2/foo [get]
@@ -57,5 +58,17 @@ func getAllFoos() {
 // @Failure 403 "Forbidden"
 // @Failure 404 "Invalid resource identifier"
 func putFoo() {
+
+}
+
+// @Title Get Foo as var
+// @Tag Vfoo
+// @Description get a foo var
+// @Route /api/v2/vfoo [get]
+// @Success 200 object FooResponse "Successful foo response"
+// @Failure 401 "Invalid access token"
+// @Failure 403 "Forbidden"
+// @Failure 404 "Invalid resource identifier"
+var getVarFoo = func() {
 
 }
