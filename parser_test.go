@@ -310,3 +310,17 @@ func TestDeterministic(t *testing.T) {
 		require.Equal(t, allOutputs[i], allOutputs[i+1])
 	}
 }
+
+func Test_parseRouteComment(t *testing.T) {
+	p, err := newParser("example/", "example/main.go", "", false)
+	require.NoError(t, err)
+
+	operation := &OperationObject{
+		Responses: map[string]*ResponseObject{},
+	}
+	p.OpenAPI.Paths["v2/foo/bar"] = &PathItemObject{}
+	p.OpenAPI.Paths["v2/foo/bar"].Get = operation
+
+	duplicateError := p.parseRouteComment(operation, "@Router v2/foo/bar [get]")
+	require.Error(t, duplicateError, "Already exists, v2/foo/bar [get]")
+}
