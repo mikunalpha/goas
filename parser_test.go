@@ -21,7 +21,7 @@ func TestExample(t *testing.T) {
 
 	fmt.Println(string(bts))
 
-	expected, err := ioutil.ReadFile("./example/example.json")
+	expected, _ := ioutil.ReadFile("./example/example.json")
 	require.JSONEq(t, string(expected), string(bts))
 }
 
