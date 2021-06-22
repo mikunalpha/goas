@@ -981,48 +981,27 @@ func (p *parser) parseResponseComment(pkgPath, pkgName string, operation *Operat
 	return nil
 }
 
-func (p *parser) getOperation(route string, method string) *OperationObject {
+func (p *parser) routeAndMethodExist(route string, method string) bool {
 	switch strings.ToUpper(method) {
 	case http.MethodGet:
-		return p.OpenAPI.Paths[route].Get
+		return p.OpenAPI.Paths[route].Get != nil
 	case http.MethodPost:
-		return p.OpenAPI.Paths[route].Post
+		return p.OpenAPI.Paths[route].Post != nil
 	case http.MethodPatch:
-		return p.OpenAPI.Paths[route].Patch
+		return p.OpenAPI.Paths[route].Patch != nil
 	case http.MethodPut:
-		return p.OpenAPI.Paths[route].Put
+		return p.OpenAPI.Paths[route].Put != nil
 	case http.MethodDelete:
-		return p.OpenAPI.Paths[route].Delete
+		return p.OpenAPI.Paths[route].Delete != nil
 	case http.MethodOptions:
-		return p.OpenAPI.Paths[route].Options
+		return p.OpenAPI.Paths[route].Options != nil
 	case http.MethodHead:
-		return p.OpenAPI.Paths[route].Head
+		return p.OpenAPI.Paths[route].Head != nil
 	case http.MethodTrace:
-		return p.OpenAPI.Paths[route].Trace
+		return p.OpenAPI.Paths[route].Trace != nil
 	}
-	return nil
-}
 
-func (p *parser) setOperation(route string, method string, operation *OperationObject) error {
-	switch strings.ToUpper(method) {
-	case http.MethodGet:
-		p.OpenAPI.Paths[route].Get = operation
-	case http.MethodPost:
-		p.OpenAPI.Paths[route].Post = operation
-	case http.MethodPatch:
-		p.OpenAPI.Paths[route].Patch = operation
-	case http.MethodPut:
-		p.OpenAPI.Paths[route].Put = operation
-	case http.MethodDelete:
-		p.OpenAPI.Paths[route].Delete = operation
-	case http.MethodOptions:
-		p.OpenAPI.Paths[route].Options = operation
-	case http.MethodHead:
-		p.OpenAPI.Paths[route].Head = operation
-	case http.MethodTrace:
-		p.OpenAPI.Paths[route].Trace = operation
-	}
-	return nil
+	return false
 }
 
 func (p *parser) parseRouteComment(operation *OperationObject, comment string) error {
@@ -1038,11 +1017,30 @@ func (p *parser) parseRouteComment(operation *OperationObject, comment string) e
 	_, ok := p.OpenAPI.Paths[matches[1]]
 	if !ok {
 		p.OpenAPI.Paths[matches[1]] = &PathItemObject{}
-	} else if p.getOperation(matches[1], matches[2]) != nil {
+	} else if p.routeAndMethodExist(matches[1], matches[2]) {
 		return fmt.Errorf("Already exists, %q [%q]", matches[1], matches[2])
 	}
 
-	return p.setOperation(matches[1], matches[2], operation)
+	switch strings.ToUpper(matches[2]) {
+	case http.MethodGet:
+		p.OpenAPI.Paths[matches[1]].Get = operation
+	case http.MethodPost:
+		p.OpenAPI.Paths[matches[1]].Post = operation
+	case http.MethodPatch:
+		p.OpenAPI.Paths[matches[1]].Patch = operation
+	case http.MethodPut:
+		p.OpenAPI.Paths[matches[1]].Put = operation
+	case http.MethodDelete:
+		p.OpenAPI.Paths[matches[1]].Delete = operation
+	case http.MethodOptions:
+		p.OpenAPI.Paths[matches[1]].Options = operation
+	case http.MethodHead:
+		p.OpenAPI.Paths[matches[1]].Head = operation
+	case http.MethodTrace:
+		p.OpenAPI.Paths[matches[1]].Trace = operation
+	}
+
+	return nil
 }
 
 func (p *parser) getSchemaObjectCached(pkgPath, pkgName, typeName string) (*SchemaObject, error) {
