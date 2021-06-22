@@ -322,5 +322,5 @@ func Test_parseRouteComment(t *testing.T) {
 	p.OpenAPI.Paths["v2/foo/bar"].Get = operation
 
 	duplicateError := p.parseRouteComment(operation, "@Router v2/foo/bar [get]")
-	require.Error(t, duplicateError, "Already exists, v2/foo/bar [get]")
+	require.Error(t, duplicateError)
 }
