@@ -190,3 +190,19 @@ goas --module-path . --output oas.json
 // go.mod and main file are in the different directory
 goas --module-path . --main-file-path ./cmd/xxx/main.go --output oas.json
 ```
+
+## Local Development
+
+### Unit tests
+
+Run `go mod tidy` in the `example` directory.
+
+Run `go test` in root directory to run unit tests.
+
+### Build and run
+
+`go build` to build, then run `goas` as above. e.g. to run against the `example` application, from the `example` directory run:
+
+```
+../goas --module-path . --main-file-path ./main.go --output example.json
+```
