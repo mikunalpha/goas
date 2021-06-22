@@ -981,6 +981,29 @@ func (p *parser) parseResponseComment(pkgPath, pkgName string, operation *Operat
 	return nil
 }
 
+func (p *parser) routeAndMethodExist(route string, method string) bool {
+	switch strings.ToUpper(method) {
+	case http.MethodGet:
+		return p.OpenAPI.Paths[route].Get != nil
+	case http.MethodPost:
+		return p.OpenAPI.Paths[route].Post != nil
+	case http.MethodPatch:
+		return p.OpenAPI.Paths[route].Patch != nil
+	case http.MethodPut:
+		return p.OpenAPI.Paths[route].Put != nil
+	case http.MethodDelete:
+		return p.OpenAPI.Paths[route].Delete != nil
+	case http.MethodOptions:
+		return p.OpenAPI.Paths[route].Options != nil
+	case http.MethodHead:
+		return p.OpenAPI.Paths[route].Head != nil
+	case http.MethodTrace:
+		return p.OpenAPI.Paths[route].Trace != nil
+	}
+
+	return false
+}
+
 func (p *parser) parseRouteComment(operation *OperationObject, comment string) error {
 	sourceString := strings.TrimSpace(comment[len("@Router"):])
 
@@ -994,6 +1017,8 @@ func (p *parser) parseRouteComment(operation *OperationObject, comment string) e
 	_, ok := p.OpenAPI.Paths[matches[1]]
 	if !ok {
 		p.OpenAPI.Paths[matches[1]] = &PathItemObject{}
+	} else if p.routeAndMethodExist(matches[1], matches[2]) {
+		return fmt.Errorf("Already exists, %q [%q]", matches[1], matches[2])
 	}
 
 	switch strings.ToUpper(matches[2]) {
