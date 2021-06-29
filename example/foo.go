@@ -72,3 +72,16 @@ func putFoo() {
 var getVarFoo = func() {
 
 }
+
+// @Title Get foos with spaces
+// @Tag Foo With Spaces
+// @Description Get foos with spaces
+// @OperationId getFoosWithSpaces
+// @Route /api/v2/foo-spaces [get]
+// @Success 200 object FooResponse "Successful foo response"
+// @Failure 401 "Invalid access token"
+// @Failure 403 "Forbidden"
+// @Failure 404 "Invalid resource identifier"
+func getFoosSpacesInTag() {
+
+}

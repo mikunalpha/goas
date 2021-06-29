@@ -44,7 +44,7 @@
           }
         },
         "tags": [
-          "foo"
+          "Foo"
         ],
         "summary": "Get all foos",
         "description": " Get all foos",
@@ -74,6 +74,37 @@
         },
         "summary": "Put foo",
         "description": " Overwrite a foo"
+      }
+    },
+    "/api/v2/foo-spaces": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful foo response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/example.FooResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid access token"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Invalid resource identifier"
+          }
+        },
+        "tags": [
+          "Foo With Spaces"
+        ],
+        "summary": "Get foos with spaces",
+        "description": " Get foos with spaces",
+        "operationId": "getFoosWithSpaces"
       }
     },
     "/api/v2/foo/{id}/inner": {
@@ -127,7 +158,7 @@
           }
         },
         "tags": [
-          "vfoo"
+          "Vfoo"
         ],
         "summary": "Get Foo as var",
         "description": " get a foo var"

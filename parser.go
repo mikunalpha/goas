@@ -758,7 +758,7 @@ func (p *parser) parseOperation(pkgPath, pkgName string, astComments []*ast.Comm
 		case "@success", "@failure":
 			err = p.parseResponseComment(pkgPath, pkgName, operation, strings.TrimSpace(comment[len(attribute):]))
 		case "@resource", "@tag":
-			resource := strings.ToLower(strings.TrimSpace(comment[len(attribute):]))
+			resource := strings.TrimSpace(comment[len(attribute):])
 			if resource == "" {
 				resource = "others"
 			}
