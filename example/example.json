@@ -294,5 +294,14 @@
         "write"
       ]
     }
+  ],
+  "tags": [
+    {
+      "name": "Foo"
+    },
+    {
+      "name": "Bar",
+      "description": "Baz"
+    }
   ]
 }

@@ -57,3 +57,25 @@ func Test_parseRouteComment(t *testing.T) {
 	duplicateError := p.parseRouteComment(operation, "@Router v2/foo/bar [get]")
 	require.Error(t, duplicateError)
 }
+
+func Test_parseTags(t *testing.T) {
+	t.Run("name", func(t *testing.T) {
+		result, err := parseTags("@Tags \"Foo\"")
+
+		require.NoError(t, err)
+		require.Equal(t, &TagDefinition{Name: "Foo"}, result)
+	})
+
+	t.Run("name and description", func(t *testing.T) {
+		result, err := parseTags("@Tags \"Foobar\" \"Barbaz\"")
+
+		require.NoError(t, err)
+		require.Equal(t, &TagDefinition{Name: "Foobar", Description: "Barbaz"}, result)
+	})
+
+	t.Run("invalid tag", func(t *testing.T) {
+		_, err := parseTags("@Tags Foobar Barbaz")
+
+		require.Error(t, err)
+	})
+}

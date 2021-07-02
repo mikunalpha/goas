@@ -389,6 +389,14 @@ func (p *parser) parseInfo() error {
 					}
 
 					oauthScopes[fields[0]][fields[1]] = strings.Join(fields[2:], " ")
+				case "@tags":
+					t, err := parseTags(comment)
+
+					if err != nil {
+						return err
+					}
+
+					p.OpenAPI.Tags = append(p.OpenAPI.Tags, *t)
 				}
 			}
 		}
@@ -420,6 +428,20 @@ func (p *parser) parseInfo() error {
 	}
 
 	return nil
+}
+
+func parseTags(comment string) (*TagDefinition, error) {
+	re, _ := regexp.Compile("\"([^\"]*)\"")
+	matches := re.FindAllStringSubmatch(comment, -1)
+	if len(matches) == 0 || len(matches[0]) == 1 {
+		return nil, fmt.Errorf("Expected: @Tags \"<name>\" [\"<description>\"] Received: %s", comment)
+	}
+	tag := TagDefinition{Name: matches[0][1]}
+	if len(matches) > 1 {
+		tag.Description = matches[1][1]
+	}
+
+	return &tag, nil
 }
 
 func (p *parser) parseModule() error {
