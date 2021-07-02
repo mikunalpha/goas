@@ -58,6 +58,17 @@ func Test_parseRouteComment(t *testing.T) {
 	require.Error(t, duplicateError)
 }
 
+func Test_infoDescriptionRef(t *testing.T) {
+	p, err := newParser("example/", "example/main.go", "", false)
+	require.NoError(t, err)
+	p.OpenAPI.Info.Description = &ReffableString{Value: "$ref:http://dopeoplescroll.com/"}
+
+	result, err := json.Marshal(p.OpenAPI.Info.Description)
+
+	require.NoError(t, err)
+	require.Equal(t, "{\"$ref\":\"http://dopeoplescroll.com/\"}", string(result))
+}
+
 func Test_parseTags(t *testing.T) {
 	t.Run("name", func(t *testing.T) {
 		result, err := parseTags("@Tags \"Foo\"")
@@ -70,7 +81,15 @@ func Test_parseTags(t *testing.T) {
 		result, err := parseTags("@Tags \"Foobar\" \"Barbaz\"")
 
 		require.NoError(t, err)
-		require.Equal(t, &TagDefinition{Name: "Foobar", Description: "Barbaz"}, result)
+		require.Equal(t, &TagDefinition{Name: "Foobar", Description: &ReffableString{Value: "Barbaz"}}, result)
+	})
+
+	t.Run("name and description including ref ", func(t *testing.T) {
+		result, err := parseTags("@Tags \"Foobar\" \"$ref:path/to/baz\"")
+		require.NoError(t, err)
+		b, err := json.Marshal(result)
+		require.NoError(t, err)
+		require.Equal(t, "{\"name\":\"Foobar\",\"description\":{\"$ref\":\"path/to/baz\"}}", string(b))
 	})
 
 	t.Run("invalid tag", func(t *testing.T) {

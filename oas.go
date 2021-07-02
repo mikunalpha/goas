@@ -1,6 +1,12 @@
 package main
 
-import "github.com/iancoleman/orderedmap"
+import (
+	"encoding/json"
+	"errors"
+	"strings"
+
+	"github.com/iancoleman/orderedmap"
+)
 
 const (
 	OpenAPIVersion = "3.0.0"
@@ -31,12 +37,33 @@ type ServerObject struct {
 }
 
 type InfoObject struct {
-	Title          string         `json:"title"`
-	Description    string         `json:"description,omitempty"`
-	TermsOfService string         `json:"termsOfService,omitempty"`
-	Contact        *ContactObject `json:"contact,omitempty"`
-	License        *LicenseObject `json:"license,omitempty"`
-	Version        string         `json:"version"`
+	Title          string          `json:"title"`
+	Description    *ReffableString `json:"description,omitempty"`
+	TermsOfService string          `json:"termsOfService,omitempty"`
+	Contact        *ContactObject  `json:"contact,omitempty"`
+	License        *LicenseObject  `json:"license,omitempty"`
+	Version        string          `json:"version"`
+}
+
+// Wrapper for a string that may be of the form `$ref:foo`
+// denoting it should be json encoded as `{ "$ref": "foo" }`
+type ReffableString struct {
+	Value string
+}
+
+type reference struct {
+	Ref string `json:"$ref"`
+}
+
+func (r ReffableString) MarshalJSON() ([]byte, error) {
+	if strings.HasPrefix(r.Value, "$ref:") {
+		if r.Value == "$ref:" {
+			return nil, errors.New("$ref is missing URL")
+		}
+		// encode as a reference object instead of a string
+		return json.Marshal(reference{Ref: r.Value[5:]})
+	}
+	return json.Marshal(r.Value)
 }
 
 type ContactObject struct {
@@ -265,6 +292,6 @@ type SecuritySchemeOauthFlowObject struct {
 }
 
 type TagDefinition struct {
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
+	Name        string          `json:"name"`
+	Description *ReffableString `json:"description,omitempty"`
 }

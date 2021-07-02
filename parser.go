@@ -289,7 +289,10 @@ func (p *parser) parseInfo() error {
 				case "@title":
 					p.OpenAPI.Info.Title = value
 				case "@description":
-					p.OpenAPI.Info.Description = value
+					if p.OpenAPI.Info.Description == nil {
+						p.OpenAPI.Info.Description = &ReffableString{}
+					}
+					p.OpenAPI.Info.Description.Value = value
 				case "@termsofserviceurl":
 					p.OpenAPI.Info.TermsOfService = value
 				case "@contactname":
@@ -438,7 +441,7 @@ func parseTags(comment string) (*TagDefinition, error) {
 	}
 	tag := TagDefinition{Name: matches[0][1]}
 	if len(matches) > 1 {
-		tag.Description = matches[1][1]
+		tag.Description = &ReffableString{Value: matches[1][1]}
 	}
 
 	return &tag, nil
