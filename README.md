@@ -149,6 +149,14 @@ func PostUser() {
 - {required}: `true`, `false`, `required` or `optional`. 
 - {description}: The description of the parameter. Must be quoted.
 
+##### allOf, anyOf, oneOf, not
+
+`allOf`, `anyOf`, `oneOf` and `not` are supported for `body` parameter types. `not` requires a single argument, while the others require one or more. e.g.
+
+```
+@Param user body oneOf(User,string) true "Info of a user."
+```
+
 #### Response
 ```
 @Success  {status}  {jsonType}  {goType}       {description}

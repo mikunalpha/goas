@@ -176,6 +176,11 @@ type SchemaObject struct {
 	// Ref is used when SchemaObject is as a ReferenceObject
 	Ref string `json:"$ref,omitempty"`
 
+	AllOf []*SchemaObject `json:"allOf,omitempty"`
+	OneOf []*SchemaObject `json:"oneOf,omitempty"`
+	AnyOf []*SchemaObject `json:"anyOf,omitempty"`
+	Not   *SchemaObject   `json:"not,omitempty"`
+
 	// Title
 	// MultipleOf
 	// Maximum
@@ -191,10 +196,6 @@ type SchemaObject struct {
 	// MaxProperties
 	// MinProperties
 	// Enum
-	// AllOf
-	// OneOf
-	// AnyOf
-	// Not
 	// Description
 	// Default
 	// Nullable

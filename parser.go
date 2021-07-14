@@ -804,7 +804,7 @@ func (p *parser) parseParamComment(pkgPath, pkgName string, operation *Operation
 	// {name}  {in}  {goType}  {required}  {description}
 	// user    body  User      true        "Info of a user."
 	// f       file  ignored   true        "Upload a file."
-	re := regexp.MustCompile(`([-\w]+)[\s]+([\w]+)[\s]+([\w./\[\]]+)[\s]+([\w]+)[\s]+"([^"]+)"`)
+	re := regexp.MustCompile(`([-\w]+)[\s]+([\w]+)[\s]+([\w./\[\]\\(\\),]+)[\s]+([\w]+)[\s]+"([^"]+)"`)
 	matches := re.FindStringSubmatch(comment)
 	if len(matches) != 6 {
 		return fmt.Errorf("parseParamComment can not parse param comment \"%s\"", comment)
@@ -900,35 +900,45 @@ func (p *parser) parseParamComment(pkgPath, pkgName string, operation *Operation
 		}
 	}
 
-	if strings.HasPrefix(goType, "[]") || strings.HasPrefix(goType, "map[]") || goType == "time.Time" {
-		schema, err := p.parseSchemaObject(pkgPath, pkgName, goType, true)
-		if err != nil {
-			p.debug("parseResponseComment cannot parse goType", goType)
-		}
-		operation.RequestBody.Content[ContentTypeJson] = &MediaTypeObject{
-			Schema: *schema,
-		}
-	} else {
-		typeName, err := p.registerType(pkgPath, pkgName, matches[3])
-		if err != nil {
-			return err
-		}
-		if isBasicGoType(typeName) {
-			operation.RequestBody.Content[ContentTypeJson] = &MediaTypeObject{
-				Schema: SchemaObject{
-					Type: &stringType,
-				},
-			}
-		} else {
-			operation.RequestBody.Content[ContentTypeJson] = &MediaTypeObject{
-				Schema: SchemaObject{
-					Ref: addSchemaRefLinkPrefix(typeName),
-				},
-			}
-		}
+	s, err := p.parseBodyType(pkgPath, pkgName, goType)
+	if err != nil {
+		return err
+	}
+	operation.RequestBody.Content[ContentTypeJson] = &MediaTypeObject{
+		Schema: *s,
 	}
 
 	return nil
+}
+
+func (p *parser) parseBodyType(pkgPath, pkgName, typeName string) (*SchemaObject, error) {
+	if strings.HasPrefix(typeName, "[]") || strings.HasPrefix(typeName, "map[]") || typeName == "time.Time" {
+		schema, err := p.parseSchemaObject(pkgPath, pkgName, typeName, true)
+		if err != nil {
+			p.debug("parseResponseComment cannot parse type", typeName)
+		}
+		return schema, nil
+	}
+
+	// handle oneOf/anyOf/allOf/not
+	sob, err := p.handleCompoundType(pkgPath, pkgName, typeName)
+	if sob != nil || err != nil {
+		return sob, err
+	}
+
+	registeredTypeName, err := p.registerType(pkgPath, pkgName, typeName)
+	if err != nil {
+		return nil, err
+	}
+	if isBasicGoType(registeredTypeName) {
+		return &SchemaObject{
+			Type: &stringType,
+		}, nil
+	} else {
+		return &SchemaObject{
+			Ref: addSchemaRefLinkPrefix(registeredTypeName),
+		}, nil
+	}
 }
 
 func (p *parser) parseResponseComment(pkgPath, pkgName string, operation *OperationObject, comment string) error {
@@ -1101,6 +1111,57 @@ func (p *parser) registerType(pkgPath, pkgName, typeName string) (string, error)
 		registerTypeName = schemaObject.ID
 	}
 	return registerTypeName, nil
+}
+
+func trimSplit(csl string) []string {
+	s := strings.Split(csl, ",")
+	for i := range s {
+		s[i] = strings.TrimSpace(s[i])
+	}
+	return s
+}
+
+func (p *parser) handleCompoundType(pkgPath, pkgName, typeName string) (*SchemaObject, error) {
+	re := regexp.MustCompile("(oneOf|anyOf|allOf|not)\\(([^\\)]*)\\)")
+	matches := re.FindStringSubmatch(typeName)
+	if len(matches) < 3 {
+		return nil, nil
+	}
+	op := matches[1]
+	if matches[2] == "" {
+		return nil, fmt.Errorf("Expected 1 or more arguments, received '%s'", typeName)
+	}
+	args := trimSplit(matches[2])
+
+	// not only supports one arg
+	if op == "not" && len(args) != 1 {
+		return nil, fmt.Errorf("Invalid number of arguments for not compound type, expected 1 received %d", len(args))
+	}
+
+	var sobs []*SchemaObject
+	for i := range args {
+		result, err := p.parseBodyType(pkgPath, pkgName, args[i])
+		if err != nil {
+			return nil, err
+		}
+		sobs = append(sobs, result)
+	}
+
+	sob := &SchemaObject{}
+	switch op {
+	case "not":
+		sob.Not = sobs[0]
+	case "oneOf":
+		sob.OneOf = sobs
+	case "anyOf":
+		sob.AnyOf = sobs
+	case "allOf":
+		sob.AllOf = sobs
+	default:
+		return nil, fmt.Errorf("Invalid compound type '%s'", op)
+	}
+
+	return sob, nil
 }
 
 func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string, register bool) (*SchemaObject, error) {

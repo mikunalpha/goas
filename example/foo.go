@@ -37,6 +37,20 @@ type Environment struct {
 	Name string `json:"name"`
 }
 
+type FooPatchOperation struct {
+	op    string
+	path  string
+	value string
+}
+
+type FooPatchOperationSet struct {
+	operations []FooPatchOperation
+}
+
+type FooMergePatch struct {
+	Count int64 `json:"count"`
+}
+
 // @Title Get all foos
 // @Tag Foo
 // @Description Get all foos
@@ -58,6 +72,19 @@ func getAllFoos() {
 // @Failure 403 "Forbidden"
 // @Failure 404 "Invalid resource identifier"
 func putFoo() {
+
+}
+
+// @Title Update foo
+// @OperationId patchFoo
+// @Route /api/v2/foo/{id} [patch]
+// @Param id path string true "Foo id"
+// @Param foo body oneOf(FooPatchOperationSet,FooMergePatch) true "Foo patch body"
+// @Success 204 "No content"
+// @Failure 401 "Invalid access token"
+// @Failure 403 "Forbidden"
+// @Failure 404 "Invalid resource identifier"
+func patchFoo() {
 
 }
 

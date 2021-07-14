@@ -107,6 +107,56 @@
         "operationId": "getFoosWithSpaces"
       }
     },
+    "/api/v2/foo/{id}": {
+      "patch": {
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "description": "Invalid access token"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Invalid resource identifier"
+          }
+        },
+        "summary": "Update foo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Foo id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "string",
+              "description": "Foo id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/example.FooPatchOperationSet"
+                  },
+                  {
+                    "$ref": "#/components/schemas/example.FooMergePatch"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "operationId": "patchFoo"
+      }
+    },
     "/api/v2/foo/{id}/inner": {
       "put": {
         "responses": {
@@ -179,6 +229,51 @@
         "properties": {
           "name": {
             "type": "string"
+          }
+        }
+      },
+      "example.FooMergePatch": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "example.FooPatchOperation": {
+        "type": "object",
+        "properties": {
+          "op": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "example.FooPatchOperationSet": {
+        "type": "object",
+        "properties": {
+          "operations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "op": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
           }
         }
       },
