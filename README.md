@@ -42,6 +42,7 @@ The service description comments can be located in any of your .go files. They p
 // @Server http://www.fake2.com Server-2
 // @Security AuthorizationHeader read write
 // @SecurityScheme AuthorizationHeader http bearer Input your token
+// @PackageAlias "example" ""
 ```
 
 #### Security

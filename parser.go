@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/ast"
 	goparser "go/parser"
@@ -37,7 +38,8 @@ type parser struct {
 	GoModCachePath string
 	GoRootSrcPath  string
 
-	OpenAPI OpenAPIObject
+	OpenAPI        OpenAPIObject
+	PackageAliases map[string]string
 
 	CorePkgs      map[string]bool
 	KnownPkgs     []pkg
@@ -209,7 +211,9 @@ func newParser(modulePath, mainFilePath, handlerPath string, debug bool) (*parse
 
 func (p *parser) parse() error {
 	// parse basic info
-	err := p.parseInfo()
+	p.PackageAliases = make(map[string]string)
+
+	err := p.parseEntryPoint()
 	if err != nil {
 		return err
 	}
@@ -261,7 +265,7 @@ func (p *parser) CreateOASFile(path string) error {
 	return err
 }
 
-func (p *parser) parseInfo() error {
+func (p *parser) parseEntryPoint() error {
 	fileTree, err := goparser.ParseFile(token.NewFileSet(), p.MainFilePath, nil, goparser.ParseComments)
 	if err != nil {
 		return fmt.Errorf("can not parse general API information: %v", err)
@@ -400,6 +404,13 @@ func (p *parser) parseInfo() error {
 					}
 
 					p.OpenAPI.Tags = append(p.OpenAPI.Tags, *t)
+				case "@packagealias":
+					originalName, newName, err := parsePackageAliases(comment)
+
+					if err != nil {
+						return err
+					}
+					p.PackageAliases[originalName] = newName
 				}
 			}
 		}
@@ -433,8 +444,17 @@ func (p *parser) parseInfo() error {
 	return nil
 }
 
+func parsePackageAliases(comment string) (string, string, error) {
+	re := regexp.MustCompile("\"([^\"]*)\"")
+	matches := re.FindAllStringSubmatch(comment, -1)
+	if len(matches) == 0 || len(matches[0]) == 1 {
+		return "", "", fmt.Errorf("Expected: @PackageAlias \"<name>\" \"<alias>\"] Received: %s", comment)
+	}
+	return matches[0][1], matches[1][1], nil
+}
+
 func parseTags(comment string) (*TagDefinition, error) {
-	re, _ := regexp.Compile("\"([^\"]*)\"")
+	re := regexp.MustCompile("\"([^\"]*)\"")
 	matches := re.FindAllStringSubmatch(comment, -1)
 	if len(matches) == 0 || len(matches[0]) == 1 {
 		return nil, fmt.Errorf("Expected: @Tags \"<name>\" [\"<description>\"] Received: %s", comment)
@@ -1082,10 +1102,9 @@ func (p *parser) getSchemaObjectCached(pkgPath, pkgName, typeName string) (*Sche
 	var schemaObject *SchemaObject
 
 	// see if we've already parsed this type
-	if knownObj, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, typeName)]; ok {
-		schemaObject = knownObj
-	} else if foundType, ok := p.KnownIDSchema[typeName]; ok {
-		schemaObject = foundType
+	cachedObj := p.checkCache(pkgName, typeName)
+	if cachedObj != nil {
+		return cachedObj, nil
 	} else {
 		// if not, parse it now
 		parsedObject, err := p.parseSchemaObject(pkgPath, pkgName, typeName, true)
@@ -1110,6 +1129,11 @@ func (p *parser) registerType(pkgPath, pkgName, typeName string) (string, error)
 		}
 		registerTypeName = schemaObject.ID
 	}
+
+	if registerTypeName == "" {
+		return "", errors.New(fmt.Sprintf("Could not parse schema for %s %s %s", pkgName, pkgName, typeName))
+	}
+
 	return registerTypeName, nil
 }
 
@@ -1174,7 +1198,7 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string, register b
 	if strings.HasPrefix(typeName, "[]") {
 		schemaObject.Type = &arrayType
 		itemTypeName := typeName[2:]
-		schema, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, itemTypeName)]
+		schema, ok := p.KnownIDSchema[genSchemaObjectID(pkgName, itemTypeName, p.PackageAliases)]
 		if ok {
 			schemaObject.Items = &SchemaObject{Ref: addSchemaRefLinkPrefix(schema.ID)}
 			return &schemaObject, nil
@@ -1187,7 +1211,7 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string, register b
 	} else if strings.HasPrefix(typeName, "map[]") {
 		schemaObject.Type = &objectType
 		itemTypeName := typeName[5:]
-		schema, ok := p.KnownIDSchema[genSchemeaObjectID(pkgName, itemTypeName)]
+		schema, ok := p.KnownIDSchema[genSchemaObjectID(pkgName, itemTypeName, p.PackageAliases)]
 		if ok {
 			schemaObject.AdditionalProperties = &SchemaObject{Ref: addSchemaRefLinkPrefix(schema.ID)}
 			return &schemaObject, nil
@@ -1229,7 +1253,7 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string, register b
 			}
 		}
 		schemaObject.PkgName = pkgName
-		schemaObject.ID = genSchemeaObjectID(pkgName, typeName)
+		schemaObject.ID = genSchemaObjectID(pkgName, typeName, p.PackageAliases)
 		p.KnownIDSchema[schemaObject.ID] = &schemaObject
 	} else {
 		guessPkgName := strings.Join(typeNameParts[:len(typeNameParts)-1], "/")
@@ -1277,7 +1301,7 @@ func (p *parser) parseSchemaObject(pkgPath, pkgName, typeName string, register b
 					guessTypeName, guessPkgName)
 			}
 			schemaObject.PkgName = guessPkgName
-			schemaObject.ID = genSchemeaObjectID(guessPkgName, guessTypeName)
+			schemaObject.ID = genSchemaObjectID(guessPkgName, guessTypeName, p.PackageAliases)
 			p.KnownIDSchema[schemaObject.ID] = &schemaObject
 		}
 		pkgPath, pkgName = guessPkgPath, guessPkgName
@@ -1627,6 +1651,40 @@ func (p *parser) debugf(format string, args ...interface{}) {
 	if p.Debug {
 		log.Printf(format, args...)
 	}
+}
+
+// checkCache loops over possible aliased package names for a type to see if it's already in cache and returns that if found.
+func (p *parser) checkCache(pkgName, typeName string) *SchemaObject {
+	currentName := genSchemaObjectID(pkgName, typeName, p.PackageAliases)
+	if knownObj, ok := p.KnownIDSchema[currentName]; ok {
+		return knownObj
+	} else if knownObj, ok := p.KnownIDSchema[typeName]; ok {
+		return knownObj
+	}
+
+	for _, v := range p.PackageAliases {
+		splitName := strings.Split(currentName, ".")
+		if len(splitName) == 1 {
+			newName := v + splitName[0]
+			if foundObject, ok := p.KnownIDSchema[newName]; ok {
+				return foundObject
+			}
+		} else if len(splitName) == 2 {
+			newName := v + splitName[1]
+			if foundObject, ok := p.KnownIDSchema[newName]; ok {
+				return foundObject
+			}
+		}
+
+		typeNameParts := strings.Split(typeName, ".")
+		typeAlias := v + "." + typeNameParts[len(typeNameParts)-1]
+		if foundObject, ok := p.KnownIDSchema[typeAlias]; ok {
+			return foundObject
+		}
+
+	}
+	return nil
+
 }
 
 func sortedPackageKeys(m map[string]*ast.Package) []string {

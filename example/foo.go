@@ -33,6 +33,10 @@ type FooResponse struct {
 	RandomBool    bool                   `json:"randomBool,omitempty" example:"true"`
 }
 
+type FooBody struct {
+	Name    string      `json:"name"`
+	Example DoubleAlias `'json:"doubleAlias"`
+}
 type Environment struct {
 	Name string `json:"name"`
 }
@@ -72,6 +76,18 @@ func getAllFoos() {
 // @Failure 403 "Forbidden"
 // @Failure 404 "Invalid resource identifier"
 func putFoo() {
+
+}
+
+// @Title Post foo
+// @Description Post a foo
+// @Param foo body FooBody true "New Foo data"
+// @Route /api/v2/foo [post]
+// @Success 200 object FooResponse "Successful foo response"
+// @Failure 401 "Invalid access token"
+// @Failure 403 "Forbidden"
+// @Failure 404 "Invalid resource identifier"
+func postFoo() {
 
 }
 
