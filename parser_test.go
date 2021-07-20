@@ -130,6 +130,36 @@ func Test_handleCompoundType(t *testing.T) {
 		require.Equal(t, "{\"allOf\":[{\"type\":\"string\"},{\"type\":\"array\",\"items\":{\"type\":\"string\"}}]}", string(s))
 	})
 
+	t.Run("case insensitive oneOf", func(t *testing.T) {
+		p, err := newParser("example/", "example/main.go", "", false)
+		require.NoError(t, err)
+		result, err := p.handleCompoundType("./example", "example.com/example", "oneof(string,[]string)")
+		require.NoError(t, err)
+		s, err := json.Marshal(result)
+		require.NoError(t, err)
+		require.Equal(t, "{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"array\",\"items\":{\"type\":\"string\"}}]}", string(s))
+	})
+
+	t.Run("case insensitive anyOf", func(t *testing.T) {
+		p, err := newParser("example/", "example/main.go", "", false)
+		require.NoError(t, err)
+		result, err := p.handleCompoundType("./example", "example.com/example", "anyof(string,[]string)")
+		require.NoError(t, err)
+		s, err := json.Marshal(result)
+		require.NoError(t, err)
+		require.Equal(t, "{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"array\",\"items\":{\"type\":\"string\"}}]}", string(s))
+	})
+
+	t.Run("case insensitive allOf", func(t *testing.T) {
+		p, err := newParser("example/", "example/main.go", "", false)
+		require.NoError(t, err)
+		result, err := p.handleCompoundType("./example", "example.com/example", "allof(string,[]string)")
+		require.NoError(t, err)
+		s, err := json.Marshal(result)
+		require.NoError(t, err)
+		require.Equal(t, "{\"allOf\":[{\"type\":\"string\"},{\"type\":\"array\",\"items\":{\"type\":\"string\"}}]}", string(s))
+	})
+
 	t.Run("not", func(t *testing.T) {
 		p, err := newParser("example/", "example/main.go", "", false)
 		require.NoError(t, err)
