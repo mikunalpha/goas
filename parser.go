@@ -450,6 +450,7 @@ func parsePackageAliases(comment string) (string, string, error) {
 	if len(matches) == 0 || len(matches[0]) == 1 {
 		return "", "", fmt.Errorf("Expected: @PackageAlias \"<name>\" \"<alias>\"] Received: %s", comment)
 	}
+
 	return matches[0][1], matches[1][1], nil
 }
 
@@ -1635,6 +1636,10 @@ func parseStructTags(astField *ast.Field, structSchema *SchemaObject, fieldSchem
 
 		if desc := astFieldTag.Get("description"); desc != "" {
 			fieldSchema.Description = desc
+		}
+
+		if enum := astFieldTag.Get("goasEnum"); enum != "" {
+			fieldSchema.Enum = strings.Split(enum, ",")
 		}
 	}
 
