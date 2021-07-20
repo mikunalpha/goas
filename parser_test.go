@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -162,5 +163,75 @@ func Test_handleCompoundType(t *testing.T) {
 		require.NoError(t, err)
 		_, notErr := p.handleCompoundType("./example", "example.com/example", "oneOf()")
 		require.Error(t, notErr)
+	})
+}
+
+func Test_explodeRefs(t *testing.T) {
+	t.Run("Info.Description unchanged when not a ref", func(t *testing.T) {
+		p, err := newParser("example/", "example/main.go", "", false)
+		require.NoError(t, err)
+		p.OpenAPI.Info.Description = &ReffableString{Value: "Foo"}
+
+		err = p.explodeRefs()
+		require.NoError(t, err)
+
+		require.Equal(t, "Foo", p.OpenAPI.Info.Description.Value)
+	})
+
+	t.Run("Info.Description inlined when a ref", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+		httpmock.RegisterResponder("GET", "https://example.com",
+			httpmock.NewStringResponder(200, "The quick brown fox jumped over the lazy dog"))
+		p, err := newParser("example/", "example/main.go", "", false)
+		require.NoError(t, err)
+		p.OpenAPI.Info.Description = &ReffableString{Value: "$ref:https://example.com"}
+
+		err = p.explodeRefs()
+		require.NoError(t, err)
+
+		require.Equal(t, "The quick brown fox jumped over the lazy dog", p.OpenAPI.Info.Description.Value)
+	})
+
+	t.Run("Tags[].Description unchanged when not a ref", func(t *testing.T) {
+		p, err := newParser("example/", "example/main.go", "", false)
+		require.NoError(t, err)
+		p.OpenAPI.Tags = []TagDefinition{{Name: "Foo", Description: &ReffableString{Value: "Foobar"}}}
+
+		err = p.explodeRefs()
+		require.NoError(t, err)
+
+		require.Equal(t, "Foobar", p.OpenAPI.Tags[0].Description.Value)
+	})
+
+	t.Run("Tags[].Description inlined when a ref", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+		httpmock.RegisterResponder("GET", "https://example.com",
+			httpmock.NewStringResponder(200, "The quick brown fox jumped over the lazy dog"))
+		p, err := newParser("example/", "example/main.go", "", false)
+		require.NoError(t, err)
+		p.OpenAPI.Tags = []TagDefinition{{Name: "Foo", Description: &ReffableString{Value: "$ref:https://example.com"}}}
+
+		err = p.explodeRefs()
+		require.NoError(t, err)
+
+		require.Equal(t, "The quick brown fox jumped over the lazy dog", p.OpenAPI.Tags[0].Description.Value)
+	})
+
+	t.Run("Mixed of tag refs and non-refs", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+		httpmock.RegisterResponder("GET", "https://example.com",
+			httpmock.NewStringResponder(200, "The quick brown fox jumped over the lazy dog"))
+		p, err := newParser("example/", "example/main.go", "", false)
+		require.NoError(t, err)
+		p.OpenAPI.Tags = []TagDefinition{{Name: "Foo", Description: &ReffableString{Value: "$ref:https://example.com"}}, {Name: "Bar", Description: &ReffableString{Value: "Baz"}}}
+
+		err = p.explodeRefs()
+		require.NoError(t, err)
+
+		require.Equal(t, "The quick brown fox jumped over the lazy dog", p.OpenAPI.Tags[0].Description.Value)
+		require.Equal(t, "Baz", p.OpenAPI.Tags[1].Description.Value)
 	})
 }

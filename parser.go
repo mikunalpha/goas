@@ -256,6 +256,13 @@ func (p *parser) CreateOASFile(path string) error {
 	}
 	defer fd.Close()
 
+	// for descriptions specified with $refs, pull that content in and embed it directly
+	// TODO may be a good idea to make this optional via clarg
+	err = p.explodeRefs()
+	if err != nil {
+		return err
+	}
+
 	output, err := json.MarshalIndent(p.OpenAPI, "", "  ")
 	if err != nil {
 		return err
@@ -263,6 +270,46 @@ func (p *parser) CreateOASFile(path string) error {
 	_, err = fd.WriteString(string(output))
 
 	return err
+}
+
+func (p *parser) explodeRefs() error {
+	if p.OpenAPI.Info.Description != nil {
+		desc, err := fetchRef(p.OpenAPI.Info.Description.Value)
+		if err != nil {
+			return err
+		}
+		p.OpenAPI.Info.Description.Value = desc
+	}
+	for i, tag := range p.OpenAPI.Tags {
+		if tag.Description == nil {
+			continue
+		}
+		desc, err := fetchRef(tag.Description.Value)
+		if err != nil {
+			return err
+		}
+		p.OpenAPI.Tags[i].Description.Value = desc
+	}
+
+	return nil
+}
+
+func fetchRef(description string) (string, error) {
+	if !strings.HasPrefix(description, "$ref:") {
+		return description, nil
+	}
+	url := description[5:]
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(body), nil
 }
 
 func (p *parser) parseEntryPoint() error {
