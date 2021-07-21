@@ -1194,12 +1194,12 @@ func trimSplit(csl string) []string {
 }
 
 func (p *parser) handleCompoundType(pkgPath, pkgName, typeName string) (*SchemaObject, error) {
-	re := regexp.MustCompile("(oneOf|anyOf|allOf|not)\\(([^\\)]*)\\)")
+	re := regexp.MustCompile("(?i)(oneOf|anyOf|allOf|not)\\(([^\\)]*)\\)")
 	matches := re.FindStringSubmatch(typeName)
 	if len(matches) < 3 {
 		return nil, nil
 	}
-	op := matches[1]
+	op := strings.ToLower(matches[1])
 	if matches[2] == "" {
 		return nil, fmt.Errorf("Expected 1 or more arguments, received '%s'", typeName)
 	}
@@ -1223,11 +1223,11 @@ func (p *parser) handleCompoundType(pkgPath, pkgName, typeName string) (*SchemaO
 	switch op {
 	case "not":
 		sob.Not = sobs[0]
-	case "oneOf":
+	case "oneof":
 		sob.OneOf = sobs
-	case "anyOf":
+	case "anyof":
 		sob.AnyOf = sobs
-	case "allOf":
+	case "allof":
 		sob.AllOf = sobs
 	default:
 		return nil, fmt.Errorf("Invalid compound type '%s'", op)
