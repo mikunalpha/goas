@@ -497,6 +497,7 @@ func parsePackageAliases(comment string) (string, string, error) {
 	if len(matches) == 0 || len(matches[0]) == 1 {
 		return "", "", fmt.Errorf("Expected: @PackageAlias \"<name>\" \"<alias>\"] Received: %s", comment)
 	}
+
 	return matches[0][1], matches[1][1], nil
 }
 
@@ -1614,6 +1615,12 @@ func parseStructTags(astField *ast.Field, structSchema *SchemaObject, fieldSchem
 				fieldSchema.Deprecated = true
 				return "", true
 			}
+			parseTagValue := strings.Split(v, "=")
+			if len(parseTagValue) > 0 {
+				if parseTagValue[0] == "enum" {
+					fieldSchema.Enum = strings.Split(parseTagValue[1], " ")
+				}
+			}
 		}
 
 		if tag := astFieldTag.Get("json"); tag != "" {
@@ -1675,7 +1682,6 @@ func parseStructTags(astField *ast.Field, structSchema *SchemaObject, fieldSchem
 				}
 			}
 		}
-
 		if _, ok := astFieldTag.Lookup("required"); ok || isRequired {
 			structSchema.Required = append(structSchema.Required, name)
 		}

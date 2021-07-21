@@ -31,6 +31,7 @@ type FooResponse struct {
 	Instruction   Instruction            `json:"instruction"`
 	BsonPtr       *BsonID                `json:"bsonPtr,omitempty" example:"blah blah blah"`
 	RandomBool    bool                   `json:"randomBool,omitempty" example:"true"`
+	MyEnum        string                 `json:"myEnum" goas:"enum=value1 value2"`
 }
 
 type FooBody struct {
