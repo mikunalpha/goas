@@ -1151,7 +1151,7 @@ func (p *parser) handleCompoundType(pkgPath, pkgName, typeName string) (*SchemaO
 	if len(matches) < 3 {
 		return nil, nil
 	}
-	op := matches[1]
+	op := strings.ToLower(matches[1])
 	if matches[2] == "" {
 		return nil, fmt.Errorf("Expected 1 or more arguments, received '%s'", typeName)
 	}
@@ -1172,14 +1172,14 @@ func (p *parser) handleCompoundType(pkgPath, pkgName, typeName string) (*SchemaO
 	}
 
 	sob := &SchemaObject{}
-	switch {
-	case strings.EqualFold(op, "not"):
+	switch op {
+	case "not":
 		sob.Not = sobs[0]
-	case strings.EqualFold(op, "oneOf"):
+	case "oneof":
 		sob.OneOf = sobs
-	case strings.EqualFold(op, "anyOf"):
+	case "anyof":
 		sob.AnyOf = sobs
-	case strings.EqualFold(op, "allOf"):
+	case "allof":
 		sob.AllOf = sobs
 	default:
 		return nil, fmt.Errorf("Invalid compound type '%s'", op)
