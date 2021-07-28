@@ -275,10 +275,10 @@ func Test_descriptions(t *testing.T) {
 			Responses: map[string]*ResponseObject{},
 		}
 
-		err = p.parseDescription(operation, "@Description testing")
+		err = p.parseDescription(operation, "testing")
 		require.NoError(t, err)
 
-		require.Equal(t, " @Description testing", operation.Description)
+		require.Equal(t, " testing", operation.Description)
 	})
 
 	t.Run("Description inline when a ref", func(t *testing.T) {
@@ -294,9 +294,9 @@ func Test_descriptions(t *testing.T) {
 			Responses: map[string]*ResponseObject{},
 		}
 
-		err = p.parseDescription(operation, "@Description $ref:https://example.com")
+		err = p.parseDescription(operation, "$ref:https://example.com")
 		require.NoError(t, err)
 
-		require.Equal(t, " @Description The quick brown fox jumped over the lazy dog", operation.Description)
+		require.Equal(t, " The quick brown fox jumped over the lazy dog", operation.Description)
 	})
 }

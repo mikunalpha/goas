@@ -870,12 +870,11 @@ func (p *parser) parseOperation(pkgPath, pkgName string, astComments []*ast.Comm
 }
 
 func (p *parser) parseDescription(operation *OperationObject, description string) error {
-	sourceString := strings.TrimSpace(description[len("@Description"):])
-	desc, err := fetchRef(sourceString)
+	desc, err := fetchRef(description)
 	if err != nil {
 		return err
 	}
-	operation.Description = strings.Join([]string{operation.Description, "@Description", desc}, " ")
+	operation.Description = strings.Join([]string{operation.Description, desc}, " ")
 	return nil
 }
 
