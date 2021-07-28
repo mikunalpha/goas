@@ -265,3 +265,38 @@ func Test_explodeRefs(t *testing.T) {
 		require.Equal(t, "Baz", p.OpenAPI.Tags[1].Description.Value)
 	})
 }
+
+func Test_descriptions(t *testing.T) {
+	t.Run("Description unchanged when not a ref", func(t *testing.T) {
+		p, err := newParser("example/", "example/main.go", "", false)
+		require.NoError(t, err)
+
+		operation := &OperationObject{
+			Responses: map[string]*ResponseObject{},
+		}
+
+		err = p.parseDescription(operation, "@Description testing")
+		require.NoError(t, err)
+
+		require.Equal(t, " @Description testing", operation.Description)
+	})
+
+	t.Run("Description inline when a ref", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+		httpmock.RegisterResponder("GET", "https://example.com",
+			httpmock.NewStringResponder(200, "The quick brown fox jumped over the lazy dog"))
+
+		p, err := newParser("example/", "example/main.go", "", false)
+		require.NoError(t, err)
+
+		operation := &OperationObject{
+			Responses: map[string]*ResponseObject{},
+		}
+
+		err = p.parseDescription(operation, "@Description $ref:https://example.com")
+		require.NoError(t, err)
+
+		require.Equal(t, " @Description The quick brown fox jumped over the lazy dog", operation.Description)
+	})
+}

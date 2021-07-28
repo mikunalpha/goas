@@ -839,19 +839,20 @@ func (p *parser) parseOperation(pkgPath, pkgName string, astComments []*ast.Comm
 			continue
 		}
 		attribute := strings.Fields(comment)[0]
+		value := strings.TrimSpace(comment[len(attribute):])
 		switch strings.ToLower(attribute) {
 		case "@title":
-			operation.Summary = strings.TrimSpace(comment[len(attribute):])
+			operation.Summary = value
 		case "@description":
-			operation.Description = strings.Join([]string{operation.Description, strings.TrimSpace(comment[len(attribute):])}, " ")
+			err = p.parseDescription(operation, value)
 		case "@operationid":
-			operation.OperationID = strings.TrimSpace(comment[len(attribute):])
+			operation.OperationID = value
 		case "@param":
-			err = p.parseParamComment(pkgPath, pkgName, operation, strings.TrimSpace(comment[len(attribute):]))
+			err = p.parseParamComment(pkgPath, pkgName, operation, value)
 		case "@success", "@failure":
-			err = p.parseResponseComment(pkgPath, pkgName, operation, strings.TrimSpace(comment[len(attribute):]))
+			err = p.parseResponseComment(pkgPath, pkgName, operation, value)
 		case "@resource", "@tag":
-			resource := strings.TrimSpace(comment[len(attribute):])
+			resource := value
 			if resource == "" {
 				resource = "others"
 			}
@@ -865,6 +866,16 @@ func (p *parser) parseOperation(pkgPath, pkgName string, astComments []*ast.Comm
 			return err
 		}
 	}
+	return nil
+}
+
+func (p *parser) parseDescription(operation *OperationObject, description string) error {
+	sourceString := strings.TrimSpace(description[len("@Description"):])
+	desc, err := fetchRef(sourceString)
+	if err != nil {
+		return err
+	}
+	operation.Description = strings.Join([]string{operation.Description, "@Description", desc}, " ")
 	return nil
 }
 
