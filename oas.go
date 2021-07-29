@@ -150,8 +150,8 @@ type RequestBodyObject struct {
 }
 
 type MediaTypeObject struct {
-	Schema SchemaObject `json:"schema,omitempty"`
-	// Example string       `json:"example,omitempty"`
+	Schema  SchemaObject `json:"schema,omitempty"`
+	Example interface{}  `json:"example,omitempty"`
 
 	// Examples
 	// Encoding
