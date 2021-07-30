@@ -987,15 +987,23 @@ func (p *parser) parseParamComment(pkgPath, pkgName string, operation *Operation
 	}
 	// parse example
 	if len(matches) > 6 && matches[6] != "" {
-		exampleJsonBody := map[string]interface{}{}
-		err := json.Unmarshal([]byte(strings.Replace(matches[6], "\\\"", "\"", -1)), &exampleJsonBody)
+		exampleRequestBody, err := parseRequestBodyExample(matches[6])
 		if err != nil {
 			return err
 		}
-		operation.RequestBody.Content[ContentTypeJson].Example = exampleJsonBody
+		operation.RequestBody.Content[ContentTypeJson].Example = exampleRequestBody
 	}
 
 	return nil
+}
+
+func parseRequestBodyExample(example string) (interface{}, error) {
+	exampleRequestBody := map[string]interface{}{}
+	err := json.Unmarshal([]byte(strings.Replace(example, "\\\"", "\"", -1)), &exampleRequestBody)
+	if err != nil {
+		return nil, err
+	}
+	return exampleRequestBody, nil
 }
 
 func (p *parser) parseBodyType(pkgPath, pkgName, typeName string) (*SchemaObject, error) {

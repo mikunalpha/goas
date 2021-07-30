@@ -300,3 +300,17 @@ func Test_descriptions(t *testing.T) {
 		require.Equal(t, " The quick brown fox jumped over the lazy dog", operation.Description)
 	})
 }
+
+func Test_parseRequestBodyExample(t *testing.T) {
+	t.Run("Parses example request body", func(t *testing.T) {
+		exampleRequestBody, err := parseRequestBodyExample("{\\\"name\\\":\\\"Bilbo\\\"}")
+		require.NoError(t, err)
+
+		require.Equal(t, map[string]interface{}(map[string]interface{}{"name": "Bilbo"}), exampleRequestBody)
+	})
+
+	t.Run("Errors if example is invalid", func(t *testing.T) {
+		_, err := parseRequestBodyExample("{name:\\\"Smaug\\\"}")
+		require.Error(t, err)
+	})
+}
