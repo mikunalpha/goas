@@ -1,6 +1,11 @@
 package main
 
-import "github.com/iancoleman/orderedmap"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/iancoleman/orderedmap"
+)
 
 const (
 	OpenAPIVersion = "3.0.0"
@@ -189,6 +194,181 @@ type ResponseObject struct {
 	Ref string `json:"$ref,omitempty"`
 
 	// Links
+}
+
+type ResponseObjectPackage struct {
+	pkgPath      string
+	pkgName      string
+	jsonType     string
+	goType       string
+	desc         string
+	p            *parser
+	RO           *ResponseObject
+	handlerError error
+}
+
+func newMediaTypeObjectCustomSchema(schema SchemaObject) *MediaTypeObject {
+	return &MediaTypeObject{
+		Schema: schema,
+	}
+}
+
+func newMediaTypeObjectCustomRef(typeName string) *MediaTypeObject {
+	return &MediaTypeObject{
+		Schema: SchemaObject{
+			Ref: addSchemaRefLinkPrefix(typeName),
+		},
+	}
+}
+
+func newMediaTypeObjectCustomType(mediaType string) *MediaTypeObject {
+	return &MediaTypeObject{
+		Schema: SchemaObject{
+			Type: mediaType,
+		},
+	}
+}
+
+type ResponseObjectHandler interface {
+	execute(*ResponseObjectPackage)
+	setNext(ResponseObjectHandler)
+}
+
+type EmptyType struct {
+	next ResponseObjectHandler
+}
+
+type TerminalMediaType struct {
+	next ResponseObjectHandler
+}
+type RefType struct {
+	next ResponseObjectHandler
+}
+
+type ComplexGoType struct {
+	next ResponseObjectHandler
+}
+
+type SimpleGoType struct {
+	next ResponseObjectHandler
+}
+
+type FailType struct {
+	next ResponseObjectHandler
+}
+
+func (mt *EmptyType) execute(ROP *ResponseObjectPackage) {
+	if ROP.jsonType != "" {
+		mt.next.execute(ROP)
+	}
+}
+
+func (mt *EmptyType) setNext(ROH ResponseObjectHandler) {
+	mt.next = ROH
+}
+
+func (mt *FailType) execute(ROP *ResponseObjectPackage) {
+	ROP.handlerError = fmt.Errorf("getResponseObject - unknown json type %v", ROP.jsonType)
+}
+
+func (mt *FailType) setNext(ROH ResponseObjectHandler) {
+	mt.next = ROH
+}
+
+func (mt *TerminalMediaType) execute(ROP *ResponseObjectPackage) {
+	if isTerminal(ROP.jsonType) {
+		ROP.RO.Content[ContentTypeJson] = newMediaTypeObjectCustomType(cleanBrackets(ROP.jsonType))
+		return
+	}
+	mt.next.execute(ROP)
+}
+
+func (mt *TerminalMediaType) setNext(ROH ResponseObjectHandler) {
+	mt.next = ROH
+}
+
+func (mt *ComplexGoType) execute(ROP *ResponseObjectPackage) {
+	if isComplex(ROP.jsonType) && isComplexGoType(ROP.goType) {
+		schema, err := ROP.p.parseSchemaObject(ROP.pkgPath, ROP.pkgName, ROP.goType)
+		if err != nil {
+			ROP.p.debug("parseResponseComment: cannot parse goType", ROP.goType)
+		}
+		ROP.RO.Content[ContentTypeJson] = newMediaTypeObjectCustomSchema(*schema)
+		return
+	}
+	mt.next.execute(ROP)
+
+}
+func (mt *ComplexGoType) setNext(ROH ResponseObjectHandler) {
+	mt.next = ROH
+}
+
+func (mt *SimpleGoType) execute(ROP *ResponseObjectPackage) {
+	typeName, err := ROP.p.registerType(ROP.pkgPath, ROP.pkgName, ROP.goType)
+	if err != nil {
+		ROP.handlerError = err
+		return
+	}
+
+	if isComplex(ROP.jsonType) && isBasicGoType(typeName) {
+		ROP.RO.Content[ContentTypeText] = newMediaTypeObjectCustomType("string")
+		return
+	}
+
+	mt.next.execute(ROP)
+
+}
+
+func (mt *SimpleGoType) setNext(ROH ResponseObjectHandler) {
+	mt.next = ROH
+}
+
+func (mt *RefType) execute(ROP *ResponseObjectPackage) {
+	typeName, err := ROP.p.registerType(ROP.pkgPath, ROP.pkgName, ROP.goType)
+	if err != nil {
+		ROP.handlerError = err
+		return
+	}
+
+	if isComplex(ROP.jsonType) && !isBasicGoType(typeName) {
+		ROP.RO.Content[ContentTypeJson] = newMediaTypeObjectCustomRef(addSchemaRefLinkPrefix(typeName))
+		return
+	}
+
+	mt.next.execute(ROP)
+
+}
+
+func (mt *RefType) setNext(ROH ResponseObjectHandler) {
+	mt.next = ROH
+}
+
+func getResponseObject(ROP ResponseObjectPackage) (*ResponseObject, error) {
+	responseObject := &ResponseObject{
+		Content: map[string]*MediaTypeObject{},
+	}
+	responseObject.Description = strings.Trim(ROP.desc, "\"")
+
+	ROP.RO = responseObject
+
+	//linked list of ResponseObjects handlers
+
+	emptyResponseObject := &EmptyType{}
+	terminalResponseObject := &TerminalMediaType{}
+	ComplexGoResponseObject := &ComplexGoType{}
+	SimpleGoResponseObject := &SimpleGoType{}
+	RefGoResponseObject := &RefType{}
+	fail := &FailType{}
+
+	emptyResponseObject.setNext(terminalResponseObject)
+	terminalResponseObject.setNext(ComplexGoResponseObject)
+	ComplexGoResponseObject.setNext(SimpleGoResponseObject)
+	SimpleGoResponseObject.setNext(RefGoResponseObject)
+	RefGoResponseObject.setNext(fail)
+
+	emptyResponseObject.execute(&ROP)
+
+	return ROP.RO, ROP.handlerError
 }
 
 type HeaderObject struct {
