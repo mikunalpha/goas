@@ -69,6 +69,37 @@ func isInStringList(list []string, s string) bool {
 	return false
 }
 
+func cleanBrackets(s string) string {
+	if strings.HasPrefix(s, "{") && strings.HasSuffix(s, "}") {
+		return s[1 : len(s)-1]
+	}
+	return s
+}
+
+func isTerminal(s string) bool {
+	cleanString := cleanBrackets(s)
+	_, ok := TerminalTypes[cleanString]
+	return ok
+}
+
+func isComplex(s string) bool {
+	cleanString := cleanBrackets(s)
+	_, ok := ComplexTypes[cleanString]
+	return ok
+}
+
+var TerminalTypes = map[string]bool{
+	"string":  true,
+	"number":  true,
+	"integer": true,
+	"boolean": true,
+}
+
+var ComplexTypes = map[string]bool{
+	"array":  true,
+	"object": true,
+}
+
 var basicGoTypes = map[string]bool{
 	"bool":       true,
 	"uint":       true,
@@ -95,6 +126,10 @@ var basicGoTypes = map[string]bool{
 func isBasicGoType(typeName string) bool {
 	_, ok := basicGoTypes[typeName]
 	return ok
+}
+
+func isComplexGoType(typeName string) bool {
+	return strings.HasPrefix(typeName, "[]") || strings.HasPrefix(typeName, "map[]")
 }
 
 var goTypesOASTypes = map[string]string{
