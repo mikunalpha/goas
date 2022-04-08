@@ -823,51 +823,13 @@ func (p *parser) parseResponseComment(pkgPath, pkgName string, operation *Operat
 		return fmt.Errorf("parseResponseComment: http status must be int, but got %s", status)
 	}
 
-	// ignore type if not set
-	if jsonType := paramsMap["jsonType"]; jsonType != "" {
-		switch jsonType {
-		case "object", "array", "{object}", "{array}":
-		default:
-			return fmt.Errorf("parseResponseComment: invalid jsonType \"%s\"", paramsMap["jsonType"])
-		}
+	RespObjPkg := ResponseObjectPackage{pkgPath, pkgName, paramsMap["jsonType"], paramsMap["goType"], paramsMap["description"], p, nil, nil}
+
+	responseObject, err := getResponseObject(RespObjPkg)
+	if err != nil {
+		return err
 	}
 
-	responseObject := &ResponseObject{
-		Content: map[string]*MediaTypeObject{},
-	}
-	responseObject.Description = strings.Trim(paramsMap["description"], "\"")
-
-	if goTypeRaw := paramsMap["goType"]; goTypeRaw != "" {
-		re = regexp.MustCompile(`\[\w*\]`)
-		goType := re.ReplaceAllString(goTypeRaw, "[]")
-		if strings.HasPrefix(goType, "[]") || strings.HasPrefix(goType, "map[]") {
-			schema, err := p.parseSchemaObject(pkgPath, pkgName, goType)
-			if err != nil {
-				p.debug("parseResponseComment: cannot parse goType", goType)
-			}
-			responseObject.Content[ContentTypeJson] = &MediaTypeObject{
-				Schema: *schema,
-			}
-		} else {
-			typeName, err := p.registerType(pkgPath, pkgName, matches[3])
-			if err != nil {
-				return err
-			}
-			if isBasicGoType(typeName) {
-				responseObject.Content[ContentTypeText] = &MediaTypeObject{
-					Schema: SchemaObject{
-						Type: "string",
-					},
-				}
-			} else {
-				responseObject.Content[ContentTypeJson] = &MediaTypeObject{
-					Schema: SchemaObject{
-						Ref: addSchemaRefLinkPrefix(typeName),
-					},
-				}
-			}
-		}
-	}
 	operation.Responses[status] = responseObject
 
 	return nil
