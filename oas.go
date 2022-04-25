@@ -368,6 +368,32 @@ func getResponseObject(ROP ResponseObjectPackage) (*ResponseObject, error) {
 
 	emptyResponseObject.execute(&ROP)
 
+	/*
+		if isTerminal(ROP.jsonType) {
+			responseObject.Content[ContentTypeJson] = newMediaTypeObjectCustomType(cleanBrackets(ROP.jsonType))
+		} else if isComplex(ROP.jsonType) {
+			if isComplexGoType(ROP.goType) {
+				schema, err := ROP.p.parseSchemaObject(ROP.pkgPath, ROP.pkgName, ROP.goType)
+				if err != nil {
+					ROP.p.debug("parseResponseComment: cannot parse goType", ROP.goType)
+				}
+				responseObject.Content[ContentTypeJson] = newMediaTypeObjectCustomSchema(*schema)
+			} else {
+				typeName, err := ROP.p.registerType(ROP.pkgPath, ROP.pkgName, ROP.goType)
+				if err != nil {
+					return nil, err
+				}
+				if isBasicGoType(typeName) {
+					responseObject.Content[ContentTypeText] = newMediaTypeObjectCustomType("string")
+				} else {
+					responseObject.Content[ContentTypeJson] = newMediaTypeObjectCustomRef(addSchemaRefLinkPrefix(typeName))
+				}
+			}
+		} else if ROP.jsonType != "" {
+			return nil, fmt.Errorf("getResponseObject - unknown json type %v", ROP.jsonType)
+		}
+
+	*/
 	return ROP.RO, ROP.handlerError
 }
 
