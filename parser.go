@@ -647,7 +647,8 @@ func (p *parser) parseOperation(pkgPath, pkgName string, astComments []*ast.Comm
 	for _, astComment := range astComments {
 		comment := strings.TrimSpace(strings.TrimLeft(astComment.Text, "/"))
 		if len(comment) == 0 {
-			return nil
+			// ignore empty lines
+			continue
 		}
 		attribute := strings.Fields(comment)[0]
 		switch strings.ToLower(attribute) {
@@ -800,56 +801,35 @@ func (p *parser) parseParamComment(pkgPath, pkgName string, operation *Operation
 func (p *parser) parseResponseComment(pkgPath, pkgName string, operation *OperationObject, comment string) error {
 	// {status}  {jsonType}  {goType}     {description}
 	// 201       object      models.User  "User Model"
-	re := regexp.MustCompile(`([\d]+)[\s]+([\w\{\}]+)[\s]+([\w\-\.\/\[\]]+)[^"]*(.*)?`)
+	// if 204 or something else without empty return payload
+	// 204 "User Model"
+	re := regexp.MustCompile(`(?P<status>[\d]+)[\s]*(?P<jsonType>[\w\{\}]+)?[\s]+(?P<goType>[\w\-\.\/\[\]]+)?[^"]*(?P<description>.*)?`)
 	matches := re.FindStringSubmatch(comment)
-	if len(matches) != 5 {
-		return fmt.Errorf("parseResponseComment can not parse response comment \"%s\"", comment)
+
+	paramsMap := make(map[string]string)
+	for i, name := range re.SubexpNames() {
+		if i > 0 && i <= len(matches) {
+			paramsMap[name] = matches[i]
+		}
 	}
 
-	status := matches[1]
-	_, err := strconv.Atoi(matches[1])
+	if len(matches) <= 2 {
+		return fmt.Errorf("parseResponseComment can not parse response comment \"%s\", matches: %v", comment, matches)
+	}
+
+	status := paramsMap["status"]
+	_, err := strconv.Atoi(status)
 	if err != nil {
 		return fmt.Errorf("parseResponseComment: http status must be int, but got %s", status)
 	}
-	switch matches[2] {
-	case "object", "array", "{object}", "{array}":
-	default:
-		return fmt.Errorf("parseResponseComment: invalid jsonType %s", matches[2])
-	}
-	responseObject := &ResponseObject{
-		Content: map[string]*MediaTypeObject{},
-	}
-	responseObject.Description = strings.Trim(matches[4], "\"")
 
-	re = regexp.MustCompile(`\[\w*\]`)
-	goType := re.ReplaceAllString(matches[3], "[]")
-	if strings.HasPrefix(goType, "[]") || strings.HasPrefix(goType, "map[]") {
-		schema, err := p.parseSchemaObject(pkgPath, pkgName, goType)
-		if err != nil {
-			p.debug("parseResponseComment cannot parse goType", goType)
-		}
-		responseObject.Content[ContentTypeJson] = &MediaTypeObject{
-			Schema: *schema,
-		}
-	} else {
-		typeName, err := p.registerType(pkgPath, pkgName, matches[3])
-		if err != nil {
-			return err
-		}
-		if isBasicGoType(typeName) {
-			responseObject.Content[ContentTypeText] = &MediaTypeObject{
-				Schema: SchemaObject{
-					Type: "string",
-				},
-			}
-		} else {
-			responseObject.Content[ContentTypeJson] = &MediaTypeObject{
-				Schema: SchemaObject{
-					Ref: addSchemaRefLinkPrefix(typeName),
-				},
-			}
-		}
+	RespObjPkg := ResponseObjectPackage{pkgPath, pkgName, paramsMap["jsonType"], paramsMap["goType"], paramsMap["description"], p, nil, nil}
+
+	responseObject, err := getResponseObject(RespObjPkg)
+	if err != nil {
+		return err
 	}
+
 	operation.Responses[status] = responseObject
 
 	return nil
