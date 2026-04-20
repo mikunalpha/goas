@@ -1323,6 +1323,12 @@ func (p *parser) getTypeAsString(fieldType interface{}) string {
 		return "interface{}"
 	}
 
+	// `any` is the Go 1.18+ alias for interface{} and appears as *ast.Ident with Name "any"
+	astIdent, ok := fieldType.(*ast.Ident)
+	if ok && astIdent.Name == "any" {
+		return "interface{}"
+	}
+
 	astStarExpr, ok := fieldType.(*ast.StarExpr)
 	if ok {
 		// return fmt.Sprintf("*%v", p.getTypeAsString(astStarExpr.X))
